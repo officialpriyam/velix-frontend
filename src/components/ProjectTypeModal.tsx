@@ -30,7 +30,7 @@ interface LanguageOption {
 }
 
 const platforms: Platform[] = [
-    { id: 'minecraft', name: 'Minecraft Java', subtitle: '1.8-1.21+', icon: <img src="/platforms/minecraft.png" alt="Minecraft" className="w-5 h-5 object-contain" /> },
+    { id: 'minecraft', name: 'Minecraft Java', subtitle: '1.8-1.21+', icon: <img src="/platforms/minecraft.svg" alt="Minecraft" className="w-5 h-5 object-contain" /> },
     { id: 'hytale', name: 'Hytale (Alpha)', subtitle: 'Unofficial / Preview', icon: <img src="/platforms/hytale.png" alt="Hytale" className="w-5 h-5 object-contain" /> },
     { id: 'discord', name: 'Discord', subtitle: 'Multiple languages', icon: <img src="/platforms/discord.png" alt="Discord" className="w-5 h-5 object-contain" /> },
     { id: 'chrome', name: 'Chrome Extensions', subtitle: 'Manifest V3', icon: <img src="/platforms/chrome.png" alt="Chrome" className="w-5 h-5 object-contain" /> },
