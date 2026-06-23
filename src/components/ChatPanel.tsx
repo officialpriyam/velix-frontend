@@ -36,6 +36,7 @@ interface ChatPanelProps {
     modelDropdown?: React.ReactNode;
     typeDropdown?: React.ReactNode;
     buildResult?: BuildResult | null;
+    compiling?: boolean;
     onClearBuildResult?: () => void;
     onAutoFix?: (error: string) => void;
     onDownloadArtifact?: (historyId: number) => void;
@@ -78,6 +79,7 @@ export const ChatPanel = ({
     modelDropdown,
     typeDropdown,
     buildResult,
+    compiling = false,
     onClearBuildResult,
     onAutoFix,
     onDownloadArtifact
@@ -467,6 +469,36 @@ export const ChatPanel = ({
                     </div>
                     );
                 })}
+
+                {compiling && !buildResult && (
+                    <div className="animate-in fade-in duration-200 rounded-xl border border-[hsl(var(--surface-sunk))] overflow-hidden">
+                        <div className="flex items-center justify-between px-3 py-2 bg-[hsl(var(--surface-sunk))]">
+                            <div className="flex items-center gap-2">
+                                <Hammer className="w-3 h-3 text-muted" />
+                                <span className="text-[11px] font-medium text-muted">build</span>
+                                <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-green-500/15 text-success rounded animate-pulse">RUNNING</span>
+                            </div>
+                        </div>
+                        <div className="px-3 py-2 bg-[hsl(var(--surface))]/50 space-y-1">
+                            <div className="flex items-center gap-2 text-[10px] font-mono text-foreground/70">
+                                <span className="text-green-500">$</span>
+                                <span>{language === 'kotlin' ? 'gradle build --no-daemon' : language === 'java' ? 'mvn clean package -DskipTests' : 'compile --target plugin'}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] font-mono text-foreground/40">
+                                <span className="text-green-500">&gt;</span>
+                                <span>Resolving dependencies...</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] font-mono text-foreground/40">
+                                <span className="text-green-500">&gt;</span>
+                                <span>Compiling sources...</span>
+                                <span className="inline-block w-1.5 h-3 bg-foreground/30 animate-pulse" />
+                            </div>
+                            <div className="mt-2 h-1 w-full rounded-full bg-[hsl(var(--surface-sunk))] overflow-hidden">
+                                <div className="h-full bg-primary rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite]" style={{ width: '60%' }} />
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {buildResult && (
                     <div className="animate-in fade-in duration-200 rounded-xl border border-[hsl(var(--surface-sunk))] overflow-hidden">

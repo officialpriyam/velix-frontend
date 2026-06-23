@@ -533,6 +533,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
                         onInitialPromptHandled={() => setInitialPrompt(null)}
                         highlight={highlight}
                         buildResult={buildResult}
+                        compiling={compiling}
                         onClearBuildResult={() => setBuildResult(null)}
                         onAutoFix={handleAutoFix}
                         onDownloadArtifact={(historyId) => compilerApi.downloadArtifact(historyId)}
