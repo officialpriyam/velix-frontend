@@ -63,10 +63,14 @@ async function proxy(req: NextRequest, path: string, method: string): Promise<Ne
 }
 
 function httpRequest(path: string, method: string, body?: string, cookie?: string, contentType?: string): Promise<{ status: number; data: any; rawBody?: string; headers: Record<string, string>; setCookies: string[] }> {
+    // Backend URL: use env var on Vercel, fallback to localhost for local dev
+    const backendUrl = process.env.BACKEND_URL || 'http://127.0.0.1:3006';
+    const parsed = new URL(backendUrl);
+
     return new Promise((resolve, reject) => {
         const options: http.RequestOptions = {
-            hostname: '127.0.0.1',
-            port: 3006,
+            hostname: parsed.hostname,
+            port: parsed.port || 80,
             path: `/api/${path}`,
             method,
             headers: {
