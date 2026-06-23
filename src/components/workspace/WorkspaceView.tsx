@@ -34,7 +34,7 @@ import {
     Link2,
     RotateCcw,
 } from 'lucide-react';
-import { fileApi, compilerApi, aiApi, versionsApi, dependenciesApi } from '@/lib/api';
+import { fileApi, compilerApi, aiApi, versionsApi, dependenciesApi, copyToClipboard } from '@/lib/api';
 import { ChatPanel, BuildResult } from '@/components/ChatPanel';
 import { FileTree } from '@/components/FileTree';
 import { Editor } from '@/components/Editor';
@@ -511,7 +511,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
     };
 
     const shareLink = typeof window !== 'undefined' ? `${window.location.origin}/ide/${sessionId}` : '';
-    const handleCopyLink = () => { navigator.clipboard?.writeText(shareLink); setCopied(true); setTimeout(() => setCopied(false), 1500); };
+    const handleCopyLink = async () => { if (await copyToClipboard(shareLink)) { setCopied(true); setTimeout(() => setCopied(false), 1500); } };
 
     const fileCount = Object.keys(files).length;
     const depsSizeMB = (depsData.totalSize / (1024 * 1024)).toFixed(1);

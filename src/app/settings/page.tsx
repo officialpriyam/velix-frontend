@@ -8,7 +8,7 @@ import {
     Key, Coins, Sun, Moon, Eye, EyeOff, ExternalLink, Lock, Sparkles,
     ChevronRight, Palette, CreditCard, Zap, Crown
 } from 'lucide-react';
-import { authApi } from '@/lib/api';
+import { authApi, copyToClipboard } from '@/lib/api';
 import { MatrixRain } from '@/components/MatrixRain';
 import { TopHeader, useAuth, SharedModals } from '@/components/AppShell';
 import { useTheme } from '@/components/ThemeProvider';
@@ -126,19 +126,21 @@ export default function SettingsPage() {
         }
     };
 
-    const handleCopyAffiliate = () => {
+    const handleCopyAffiliate = async () => {
         if (!user) return;
         const refUrl = `${window.location.origin}/register?ref=${user.affiliate_code || 'VEL-USER'}`;
-        navigator.clipboard.writeText(refUrl);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 3000);
+        if (await copyToClipboard(refUrl)) {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 3000);
+        }
     };
 
-    const handleCopyId = () => {
+    const handleCopyId = async () => {
         if (!user?.profile_id) return;
-        navigator.clipboard.writeText(String(user.profile_id));
-        setCopiedId(true);
-        setTimeout(() => setCopiedId(false), 2000);
+        if (await copyToClipboard(String(user.profile_id))) {
+            setCopiedId(true);
+            setTimeout(() => setCopiedId(false), 2000);
+        }
     };
 
     const handleDeleteAccount = async () => {

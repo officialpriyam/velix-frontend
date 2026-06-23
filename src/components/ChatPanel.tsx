@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard } from 'lucide-react';
-import { aiApi } from '../lib/api';
+import { aiApi, copyToClipboard } from '../lib/api';
 import { useNotification } from './Notification';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
@@ -481,7 +481,7 @@ export const ChatPanel = ({
                                 )}
                             </div>
                             <div className="flex items-center gap-1">
-                                <button onClick={() => { navigator.clipboard?.writeText(buildResult.log || ''); showNotification('Copied.', 'success'); }} className="p-1 rounded text-muted hover:text-foreground transition-colors" title="Copy log">
+                                <button onClick={async () => { if (await copyToClipboard(buildResult.log || '')) showNotification('Copied.', 'success'); else showNotification('Copy failed', 'error'); }} className="p-1 rounded text-muted hover:text-foreground transition-colors" title="Copy log">
                                     <Copy className="w-3 h-3" />
                                 </button>
                                 <button onClick={onClearBuildResult} className="p-1 rounded text-muted hover:text-foreground transition-colors">

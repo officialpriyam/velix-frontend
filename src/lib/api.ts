@@ -1,5 +1,25 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005/api';
 
+export async function copyToClipboard(text: string): Promise<boolean> {
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch {}
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+    } catch { return false; }
+}
+
 async function safeJson(res: Response) {
     const text = await res.text();
     try { return JSON.parse(text); } catch { return { error: text.substring(0, 300) || 'Unknown error' }; }
