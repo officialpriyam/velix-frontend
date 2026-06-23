@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download } from 'lucide-react';
+import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard } from 'lucide-react';
 import { aiApi } from '../lib/api';
 import { useNotification } from './Notification';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '../lib/AuthContext';
 
 interface Message {
     id?: number;
@@ -89,6 +90,7 @@ export const ChatPanel = ({
     const [messages, setMessages] = useState<Message[]>([]);
     const [generatedFiles, setGeneratedFiles] = useState<{ created: string[]; edited: string[] }>({ created: [], edited: [] });
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const { user } = useAuth();
 
     const statusLogKey = sessionId ? `velix_status_log_${sessionId}` : '';
     const generatedFilesKey = sessionId ? `velix_generated_files_${sessionId}` : '';
@@ -191,6 +193,15 @@ export const ChatPanel = ({
         const userMsg = messageOverride || prompt.trim();
         if (!userMsg || loading) return;
 
+        // Check credits before generating
+        const credits = user?.credits ?? 0;
+        if (credits < 20) {
+            setStatusLog([{ message: `Out of credits. You have ${credits} credits. 20 credits required to generate.`, type: 'error' }]);
+            showNotification(`Out of credits! You have ${credits}. Buy more credits to continue generating.`, 'error');
+            setLoading(false);
+            return;
+        }
+
         if (compact && onPromptSubmit) {
             onPromptSubmit(userMsg);
             return;
@@ -273,7 +284,15 @@ export const ChatPanel = ({
         logs.push({ message: `Generating code...`, type: 'pending' });
         setStatusLog([...logs]);
 
-        const result = await aiApi.generate(optimizedPrompt, language, model, sessionId || undefined, platform);
+        let result: any;
+        try {
+            result = await aiApi.generate(optimizedPrompt, language, model, sessionId || undefined, platform);
+        } catch (fetchErr: any) {
+            setStatusLog([{ message: `Error: ${fetchErr.message || 'Network error'}`, type: 'error' }]);
+            showNotification(fetchErr.message || 'Failed to connect to server', 'error');
+            setLoading(false);
+            return;
+        }
 
         if (result.error) {
             setStatusLog([{ message: `Error: ${result.error}`, type: 'error' }]);

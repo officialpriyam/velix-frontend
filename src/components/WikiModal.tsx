@@ -165,16 +165,22 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
             const typeLabel = wikiType || 'custom';
             const genPrompt = prompt.trim() || `Generate ${typeLabel} documentation`;
             const result = await wikiApi.generate(sessionId, genPrompt, wikiType);
+            if (result.error) {
+                showNotification(result.error, 'error');
+                return;
+            }
             if (result.page) {
                 await loadPages();
                 setSelectedPage(result.page);
                 setEditContent(result.rawResponse || result.page.content);
                 setEditTitle(result.page.title);
+                showNotification('Wiki generated successfully!', 'success');
             }
             setPrompt('');
             setActiveCommand(null);
-        } catch (err) {
+        } catch (err: any) {
             console.error('Failed to generate wiki:', err);
+            showNotification(err.message || 'Failed to generate wiki', 'error');
         } finally {
             setGenerating(false);
         }
@@ -385,28 +391,8 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
                         )}
                     </div>
 
-                    {/* Generator - blocked if GitBook not connected */}
-                    {!gitbookConnected ? (
-                        <div className="mt-4">
-                            <div className="rounded-xl border border-danger/20 bg-danger/5 p-5 text-center">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-danger/20 bg-danger/10 text-danger mx-auto">
-                                    <AlertCircle className="w-5 h-5" />
-                                </div>
-                                <div className="mt-3 text-sm font-semibold text-foreground">GitBook Connection Required</div>
-                                <div className="mt-1 text-xs text-muted leading-relaxed">
-                                    Connect your GitBook account above before generating wiki documentation.
-                                    Pages will be pushed to your GitBook space.
-                                </div>
-                                <button
-                                    onClick={() => setShowGitbookPanel(true)}
-                                    className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-background hover:opacity-90 transition-all"
-                                >
-                                    <Link2 className="w-3 h-3" /> Connect GitBook
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <>
+                    {/* Generator - always visible */}
+                    <>
                             {/* Generator */}
                             <div className="flex flex-col items-center justify-center text-center">
                                 <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-primary">
@@ -474,8 +460,7 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
                                     </button>
                                 ))}
                             </div>
-                        </>
-                    )}
+                    </>
                 </div>
 
                 <div className="border-t border-white/5 px-4 py-2 text-[11px] text-muted">

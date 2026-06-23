@@ -381,7 +381,15 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
 
     const handleAutoFix = (error: string) => {
         setBuildResult(null);
-        setInitialPrompt(`I'm encountering this error. Please analyze it and fix the code:\n\n\`\`\`\n${error}\n\`\`\``);
+        const fileContext = Object.entries(files)
+            .filter(([path, content]) => content && !path.endsWith('/'))
+            .slice(0, 10)
+            .map(([path, content]) => `=== FILE: ${path} ===\n${content}`)
+            .join('\n\n');
+        const prompt = fileContext
+            ? `The following code has a compilation error. Analyze the error and fix ALL files so it compiles correctly.\n\nCOMPILATION ERROR:\n\`\`\`\n${error}\n\`\`\`\n\nEXISTING SOURCE FILES:\n\`\`\`\n${fileContext}\n\`\`\`\n\nFix the code and regenerate all files. Do NOT change the project structure or features — only fix compilation errors.`
+            : `The following code has a compilation error. Analyze the error and fix the code so it compiles correctly.\n\nCOMPILATION ERROR:\n\`\`\`\n${error}\n\`\`\`\n\nFix the code and regenerate all files.`;
+        setInitialPrompt(prompt);
     };
 
     const handleClone = async () => {

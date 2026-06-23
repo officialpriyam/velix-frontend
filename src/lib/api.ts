@@ -430,7 +430,7 @@ export const wikiApi = {
         });
         return safeJson(res);
     },
-    generate: async (projectId: string, prompt: string, type?: string): Promise<{ page: WikiPage; rawResponse: string; creditsUsed: number; creditsRemaining: number }> => {
+    generate: async (projectId: string, prompt: string, type?: string): Promise<{ page?: WikiPage; rawResponse?: string; creditsUsed?: number; creditsRemaining?: number; error?: string }> => {
         const res = await fetch(`${BASE_URL}/wiki/projects/${projectId}/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
