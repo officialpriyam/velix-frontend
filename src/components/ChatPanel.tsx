@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2 } from 'lucide-react';
+import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square } from 'lucide-react';
 import { aiApi, copyToClipboard } from '../lib/api';
 import { useNotification } from './Notification';
 import { useRouter } from 'next/navigation';
@@ -94,6 +94,7 @@ export const ChatPanel = ({
     const [messages, setMessages] = useState<Message[]>([]);
     const [generatedFiles, setGeneratedFiles] = useState<{ created: string[]; edited: string[] }>({ created: [], edited: [] });
     const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: string; content: string; size: number }[]>([]);
+    const abortControllerRef = useRef<AbortController | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const { user } = useAuth();
@@ -221,6 +222,13 @@ export const ChatPanel = ({
         if (bytes < 1024) return `${bytes}B`;
         if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
         return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    };
+
+    const handleStop = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
     };
 
     useEffect(() => {
@@ -381,6 +389,10 @@ export const ChatPanel = ({
         setLoading(true);
         setGeneratedFiles({ created: [], edited: [] });
 
+        // Create abort controller for this request
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         setMessages(prev => {
             const isDuplicate = prev.length > 0 && prev[prev.length - 1].role === 'user' && prev[prev.length - 1].content === userMsg;
             if (isDuplicate) return prev;
@@ -478,10 +490,14 @@ export const ChatPanel = ({
 
         let result: any;
         try {
-            result = await aiApi.generate(optimizedPrompt, language, model, sessionId || undefined, platform);
+            result = await aiApi.generate(optimizedPrompt, language, model, sessionId || undefined, platform, controller.signal);
         } catch (fetchErr: any) {
-            setStatusLog([{ message: `Error: ${fetchErr.message || 'Network error'}`, type: 'error' }]);
-            showNotification(fetchErr.message || 'Failed to connect to server', 'error');
+            if (fetchErr.name === 'AbortError') {
+                setStatusLog([{ message: 'Generation stopped by user', type: 'error' }]);
+            } else {
+                setStatusLog([{ message: `Error: ${fetchErr.message || 'Network error'}`, type: 'error' }]);
+                showNotification(fetchErr.message || 'Failed to connect to server', 'error');
+            }
             setLoading(false);
             return;
         }
@@ -877,15 +893,18 @@ export const ChatPanel = ({
                             <Sparkles className="w-3.5 h-3.5" />
                         </button>
                         <button
-                            onClick={() => handleSend()}
-                            disabled={loading || (!prompt.trim() && attachedFiles.length === 0)}
-                            className={`p-1.5 rounded-lg transition-all ${loading || (!prompt.trim() && attachedFiles.length === 0)
-                                ? 'text-faint bg-[hsl(var(--surface-sunk))]'
-                                : 'bg-foreground text-background hover:opacity-90 active:scale-95'
+                            onClick={loading ? handleStop : () => handleSend()}
+                            disabled={!loading && (!prompt.trim() && attachedFiles.length === 0)}
+                            className={`p-1.5 rounded-lg transition-all ${loading
+                                ? 'bg-red-500 text-white hover:bg-red-600 active:scale-95'
+                                : (!prompt.trim() && attachedFiles.length === 0)
+                                    ? 'text-faint bg-[hsl(var(--surface-sunk))]'
+                                    : 'bg-foreground text-background hover:opacity-90 active:scale-95'
                                 }`}
+                            title={loading ? 'Stop generation' : 'Send'}
                         >
                             {loading ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <Square className="w-3.5 h-3.5 fill-white" />
                             ) : (
                                 <Send className="w-3.5 h-3.5" />
                             )}

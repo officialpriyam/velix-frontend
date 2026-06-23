@@ -26,12 +26,13 @@ async function safeJson(res: Response) {
 }
 
 export const aiApi = {
-    generate: async (prompt: string, language: string, model?: string, sessionId?: string, platform?: string) => {
+    generate: async (prompt: string, language: string, model?: string, sessionId?: string, platform?: string, signal?: AbortSignal) => {
         const res = await fetch(`${BASE_URL}/ai/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ prompt, language, model, sessionId, platform })
+            body: JSON.stringify({ prompt, language, model, sessionId, platform }),
+            signal
         });
         return safeJson(res);
     },
