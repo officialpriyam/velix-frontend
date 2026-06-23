@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { X, Box, MessageSquare, Chrome, Puzzle, Settings, FileCode, Database, Check } from 'lucide-react';
+import { X, Box, Puzzle, Settings, FileCode, Database, Check, MessageSquare, Chrome } from 'lucide-react';
 
 interface ProjectTypeModalProps {
     isOpen: boolean;
@@ -25,15 +25,15 @@ interface Category {
 interface LanguageOption {
     id: string;
     name: string;
-    icon: string;
+    icon: React.ReactNode;
     description: string;
 }
 
 const platforms: Platform[] = [
-    { id: 'minecraft', name: 'Minecraft Java', subtitle: '1.8-1.21+', icon: <Box className="w-4 h-4" /> },
-    { id: 'hytale', name: 'Hytale (Alpha)', subtitle: 'Unofficial / Preview', icon: <Box className="w-4 h-4 text-orange-500" /> },
-    { id: 'discord', name: 'Discord', subtitle: 'Multiple languages', icon: <MessageSquare className="w-4 h-4" /> },
-    { id: 'chrome', name: 'Chrome Extensions', subtitle: 'Manifest V3', icon: <Chrome className="w-4 h-4" /> },
+    { id: 'minecraft', name: 'Minecraft Java', subtitle: '1.8-1.21+', icon: <img src="/platforms/minecraft.png" alt="Minecraft" className="w-5 h-5 object-contain" /> },
+    { id: 'hytale', name: 'Hytale (Alpha)', subtitle: 'Unofficial / Preview', icon: <img src="/platforms/hytale.png" alt="Hytale" className="w-5 h-5 object-contain" /> },
+    { id: 'discord', name: 'Discord', subtitle: 'Multiple languages', icon: <img src="/platforms/discord.png" alt="Discord" className="w-5 h-5 object-contain" /> },
+    { id: 'chrome', name: 'Chrome Extensions', subtitle: 'Manifest V3', icon: <img src="/platforms/chrome.png" alt="Chrome" className="w-5 h-5 object-contain" /> },
 ];
 
 const categories: { [platform: string]: Category[] } = {
@@ -57,25 +57,25 @@ const categories: { [platform: string]: Category[] } = {
 
 const languageOptions: { [key: string]: LanguageOption[] } = {
     'minecraft-plugins': [
-        { id: 'java', name: 'Bukkit/Spigot/Paper Plugin (Java)', icon: 'J', description: 'Server-side plugins for 1.8-1.21+' },
-        { id: 'kotlin', name: 'Bukkit/Spigot/Paper Plugin (Kotlin)', icon: 'K', description: 'Modern plugins written in Kotlin' },
+        { id: 'java', name: 'Bukkit/Spigot/Paper Plugin (Java)', icon: <img src="/platforms/java.png" alt="Java" className="w-8 h-8 object-contain" />, description: 'Server-side plugins for 1.8-1.21+' },
+        { id: 'kotlin', name: 'Bukkit/Spigot/Paper Plugin (Kotlin)', icon: <img src="/platforms/kotlin.png" alt="Kotlin" className="w-8 h-8 object-contain" />, description: 'Modern plugins written in Kotlin' },
     ],
     'minecraft-mods': [
-        { id: 'forge-java', name: 'Forge Mod (Java)', icon: 'F', description: 'Minecraft Forge modding' },
-        { id: 'fabric-java', name: 'Fabric Mod (Java)', icon: 'Fa', description: 'Fabric mod loader' },
+        { id: 'forge-java', name: 'Forge Mod (Java)', icon: <img src="/platforms/java.png" alt="Forge" className="w-8 h-8 object-contain" />, description: 'Minecraft Forge modding' },
+        { id: 'fabric-java', name: 'Fabric Mod (Java)', icon: <img src="/platforms/fabric.png" alt="Fabric" className="w-8 h-8 object-contain" />, description: 'Fabric mod loader' },
     ],
     'hytale-plugins': [
-        { id: 'hytale', name: 'Hytale Plugin', icon: 'H', description: 'Alpha support for Hytale Server' }
+        { id: 'hytale', name: 'Hytale Plugin', icon: <img src="/platforms/hytale.png" alt="Hytale" className="w-8 h-8 object-contain" />, description: 'Alpha support for Hytale Server' }
     ],
     'discord-bots': [
-        { id: 'python', name: 'Python', icon: 'Py', description: 'discord.py' },
-        { id: 'javascript', name: 'JavaScript', icon: 'JS', description: 'discord.js' },
-        { id: 'typescript', name: 'TypeScript', icon: 'TS', description: 'discord.js (TS)' },
-        { id: 'ruby', name: 'Ruby', icon: 'Rb', description: 'discordrb' },
+        { id: 'python', name: 'Python', icon: <img src="/platforms/python.png" alt="Python" className="w-8 h-8 object-contain" />, description: 'discord.py' },
+        { id: 'javascript', name: 'JavaScript', icon: <img src="/platforms/javascript.png" alt="JavaScript" className="w-8 h-8 object-contain" />, description: 'discord.js' },
+        { id: 'typescript', name: 'TypeScript', icon: <img src="/platforms/typescript.png" alt="TypeScript" className="w-8 h-8 object-contain" />, description: 'discord.js (TS)' },
+        { id: 'ruby', name: 'Ruby', icon: <img src="/platforms/ruby.png" alt="Ruby" className="w-8 h-8 object-contain" />, description: 'discordrb' },
     ],
     'chrome-extension': [
-        { id: 'javascript', name: 'JavaScript', icon: 'JS', description: 'Manifest V3 Extension' },
-        { id: 'typescript', name: 'TypeScript', icon: 'TS', description: 'TypeScript with bundler' },
+        { id: 'javascript', name: 'JavaScript', icon: <img src="/platforms/javascript.png" alt="JavaScript" className="w-8 h-8 object-contain" />, description: 'Manifest V3 Extension' },
+        { id: 'typescript', name: 'TypeScript', icon: <img src="/platforms/typescript.png" alt="TypeScript" className="w-8 h-8 object-contain" />, description: 'TypeScript with bundler' },
     ],
 };
 
@@ -144,7 +144,9 @@ export const ProjectTypeModal = ({ isOpen, onClose, onSelect }: ProjectTypeModal
                                 >
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selectedPlatform === platform.id ? 'neu-raised text-primary' : 'neu-inset'
                                         }`}>
-                                        {platform.icon}
+                                        {typeof platform.icon === 'string' ? (
+                                            <span className="text-sm font-bold">{platform.icon}</span>
+                                        ) : platform.icon}
                                     </div>
                                     <div>
                                         <div className="text-xs font-semibold">{platform.name}</div>
@@ -186,9 +188,11 @@ export const ProjectTypeModal = ({ isOpen, onClose, onSelect }: ProjectTypeModal
                                         : 'neu-inset border border-[hsl(var(--surface-sunk))] hover:border-[hsl(var(--text)/0.3)]'
                                         }`}
                                 >
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold ${selectedLanguage === lang.id ? 'neu-raised text-primary' : 'neu-raised'
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedLanguage === lang.id ? 'neu-raised text-primary' : 'neu-raised'
                                         }`}>
-                                        {lang.icon}
+                                        {typeof lang.icon === 'string' ? (
+                                            <span className="text-xl font-bold">{lang.icon}</span>
+                                        ) : lang.icon}
                                     </div>
                                     <div className="flex-1">
                                         <div className="text-sm font-semibold text-foreground">{lang.name}</div>

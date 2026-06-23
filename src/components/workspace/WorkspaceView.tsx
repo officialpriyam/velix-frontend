@@ -302,15 +302,16 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
         setBuildResult(null);
         try {
             const result = await compilerApi.run(sessionId, language);
+            const isSuccess = result.success === true || result.success === 1;
             setBuildResult({
-                success: result.success !== false,
-                log: result.log || 'Build completed successfully.',
+                success: isSuccess,
+                log: result.log || (isSuccess ? 'Build completed successfully.' : 'Build failed with errors.'),
                 compiler: compiler || selectedCompiler,
                 timestamp: new Date().toISOString(),
                 historyId: result.historyId || undefined
             });
             loadCompileHistory(sessionId);
-            showNotification(result.success !== false ? 'Build completed.' : 'Build failed.', result.success !== false ? 'success' : 'error');
+            showNotification(isSuccess ? 'Build completed.' : 'Build failed.', isSuccess ? 'success' : 'error');
         } catch (err: any) {
             setBuildResult({
                 success: false,
