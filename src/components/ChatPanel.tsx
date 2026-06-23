@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard } from 'lucide-react';
+import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2 } from 'lucide-react';
 import { aiApi, copyToClipboard } from '../lib/api';
 import { useNotification } from './Notification';
 import { useRouter } from 'next/navigation';
@@ -12,6 +12,8 @@ interface Message {
     role: 'user' | 'assistant';
     content: string;
     created_at?: string;
+    files?: any[];
+    attachments?: { name: string; type: string; size: number }[];
 }
 
 export interface BuildResult {
@@ -91,6 +93,8 @@ export const ChatPanel = ({
     const [statusLog, setStatusLog] = useState<{ message: string; type: 'pending' | 'done' | 'error' }[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
     const [generatedFiles, setGeneratedFiles] = useState<{ created: string[]; edited: string[] }>({ created: [], edited: [] });
+    const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: string; content: string; size: number }[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const { user } = useAuth();
 
@@ -102,6 +106,122 @@ export const ChatPanel = ({
     const isConfig = language?.startsWith('config-');
     const isDatapack = language?.startsWith('datapack-');
     const isScripting = language?.startsWith('scripting-');
+
+    // File upload constants
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    const MAX_FILES = 5;
+    const ACCEPTED_TYPES = {
+        'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'],
+        'text/*': ['.txt', '.md', '.log', '.csv', '.mcfunction'],
+        'application/javascript': ['.js', '.jsx', '.mjs'],
+        'application/typescript': ['.ts', '.tsx'],
+        'text/x-java': ['.java'],
+        'text/x-kotlin': ['.kt', '.kts'],
+        'text/x-python': ['.py'],
+        'text/x-yaml': ['.yml', '.yaml'],
+        'application/json': ['.json'],
+        'text/xml': ['.xml'],
+        'text/plain': ['.gradle', '.kts', '.properties', '.toml', '.sh', '.cfg', '.conf', '.ini'],
+    };
+
+    const readFileAsBase64 = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = reader.result as string;
+                // Strip the data URL prefix (e.g., "data:image/png;base64,")
+                const base64 = result.split(',')[1] || result;
+                resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const readFileAsText = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsText(file);
+        });
+    };
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        const newFiles = Array.from(files).slice(0, MAX_FILES - attachedFiles.length);
+        const processed: { name: string; type: string; content: string; size: number }[] = [];
+
+        for (const file of newFiles) {
+            if (file.size > MAX_FILE_SIZE) {
+                showNotification(`File "${file.name}" exceeds 10MB limit`, 'error');
+                continue;
+            }
+            try {
+                const isImage = file.type.startsWith('image/');
+                const content = isImage ? await readFileAsBase64(file) : await readFileAsText(file);
+                processed.push({
+                    name: file.name,
+                    type: file.type,
+                    content,
+                    size: file.size
+                });
+            } catch {
+                showNotification(`Failed to read "${file.name}"`, 'error');
+            }
+        }
+
+        setAttachedFiles(prev => [...prev, ...processed].slice(0, MAX_FILES));
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const removeAttachedFile = (index: number) => {
+        setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const files = e.dataTransfer.files;
+        if (!files || files.length === 0) return;
+
+        const newFiles = Array.from(files).slice(0, MAX_FILES - attachedFiles.length);
+        const processed: { name: string; type: string; content: string; size: number }[] = [];
+
+        for (const file of newFiles) {
+            if (file.size > MAX_FILE_SIZE) {
+                showNotification(`File "${file.name}" exceeds 10MB limit`, 'error');
+                continue;
+            }
+            try {
+                const isImage = file.type.startsWith('image/');
+                const content = isImage ? await readFileAsBase64(file) : await readFileAsText(file);
+                processed.push({
+                    name: file.name,
+                    type: file.type,
+                    content,
+                    size: file.size
+                });
+            } catch {
+                showNotification(`Failed to read "${file.name}"`, 'error');
+            }
+        }
+
+        setAttachedFiles(prev => [...prev, ...processed].slice(0, MAX_FILES));
+    };
+
+    const formatFileSize = (bytes: number) => {
+        if (bytes < 1024) return `${bytes}B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    };
 
     useEffect(() => {
         if (messagesKey && messages.length > 0) {
@@ -221,7 +341,7 @@ export const ChatPanel = ({
 
     const handleSend = async (messageOverride?: string) => {
         const userMsg = messageOverride || prompt.trim();
-        if (!userMsg || loading) return;
+        if ((!userMsg && attachedFiles.length === 0) || loading) return;
 
         // Check credits before generating
         const credits = user?.credits ?? 0;
@@ -237,19 +357,35 @@ export const ChatPanel = ({
             return;
         }
 
-        let finalPrompt = userMsg;
+        let finalPrompt = userMsg || 'Please analyze the uploaded files and help me with the following:';
         if (highlight && highlight.length > 0) {
             finalPrompt = `[PRIORITY CONTEXT: User highlighted the following code in the editor. Focus on this or use it for reference:]\n\`\`\`\n${highlight}\n\`\`\`\n\n${userMsg}`;
         }
 
+        // Attach uploaded file contents to prompt
+        if (attachedFiles.length > 0) {
+            const fileSections: string[] = [];
+            for (const f of attachedFiles) {
+                if (f.type.startsWith('image/')) {
+                    fileSections.push(`[Attached image: ${f.name} (${f.type}, ${formatFileSize(f.size)}) — base64 data available for vision models]`);
+                } else {
+                    const ext = f.name.split('.').pop()?.toLowerCase() || '';
+                    fileSections.push(`[Attached file: ${f.name}]\n\`\`\`${ext}\n${f.content}\n\`\`\``);
+                }
+            }
+            finalPrompt = `${fileSections.join('\n\n')}\n\n${finalPrompt}`;
+        }
+
         setPrompt('');
+        setAttachedFiles([]);
         setLoading(true);
         setGeneratedFiles({ created: [], edited: [] });
 
         setMessages(prev => {
             const isDuplicate = prev.length > 0 && prev[prev.length - 1].role === 'user' && prev[prev.length - 1].content === userMsg;
             if (isDuplicate) return prev;
-            return [...prev, { role: 'user', content: userMsg }];
+            const attachments = attachedFiles.map(f => ({ name: f.name, type: f.type, size: f.size }));
+            return [...prev, { role: 'user', content: userMsg, attachments: attachments.length > 0 ? attachments : undefined }];
         });
 
         if (typeof window !== 'undefined' && window.location.search) {
@@ -421,7 +557,32 @@ export const ChatPanel = ({
 
     if (compact) {
         return (
-            <div className="relative flex flex-col min-h-[150px] justify-between">
+            <div className="relative flex flex-col min-h-[150px] justify-between" onDragOver={handleDragOver} onDrop={handleDrop}>
+                {/* Attached files preview (compact) */}
+                {attachedFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 px-5 pt-3">
+                        {attachedFiles.map((f, i) => (
+                            <div key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] text-muted group">
+                                {f.type.startsWith('image/') ? <Image className="w-2.5 h-2.5" /> : <FileCode className="w-2.5 h-2.5" />}
+                                <span className="truncate max-w-[80px]">{f.name}</span>
+                                <button onClick={() => removeAttachedFile(i)} className="p-0.5 rounded hover:bg-white/10 text-muted hover:text-foreground transition-colors opacity-0 group-hover:opacity-100">
+                                    <X className="w-2 h-2" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Hidden file input (compact) */}
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.txt,.md,.log,.csv,.mcfunction,.js,.jsx,.mjs,.ts,.tsx,.java,.kt,.kts,.py,.yml,.yaml,.json,.xml,.gradle,.properties,.toml,.sh,.cfg,.conf,.ini"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                />
+
                 <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
@@ -433,7 +594,7 @@ export const ChatPanel = ({
                     }}
                     disabled={loading}
                     className="w-full bg-transparent border-0 px-5 pt-5 text-sm focus:outline-none resize-none h-[80px] placeholder:text-foreground/30 text-foreground"
-                    placeholder={isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : "Ask Velix to create a plugin about..."}
+                    placeholder={isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : attachedFiles.length > 0 ? "Add a message about the uploaded files..." : "Ask Velix to create a plugin about..."}
                 />
 
                 {statusLog.length > 0 && (
@@ -455,9 +616,12 @@ export const ChatPanel = ({
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={attachedFiles.length >= MAX_FILES}
                             className="w-7 h-7 rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] flex items-center justify-center text-foreground/50 hover:text-foreground transition-colors"
+                            title="Attach files"
                         >
-                            <span className="text-xs font-bold font-sans">+</span>
+                            <Paperclip className="w-3.5 h-3.5" />
                         </button>
                         {modelDropdown}
                         {typeDropdown}
@@ -512,7 +676,20 @@ export const ChatPanel = ({
                             : 'text-foreground/90'
                             }`}>
                             {msg.role === 'user' ? (
-                                <p className="font-medium">{msg.content}</p>
+                                <>
+                                    <p className="font-medium">{msg.content}</p>
+                                    {msg.attachments && msg.attachments.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 mt-2">
+                                            {msg.attachments.map((att, ai) => (
+                                                <div key={ai} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] text-muted">
+                                                    {att.type.startsWith('image/') ? <Image className="w-2.5 h-2.5" /> : <FileCode className="w-2.5 h-2.5" />}
+                                                    <span>{att.name}</span>
+                                                    <span className="text-foreground/30">{formatFileSize(att.size)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
                             ) : (
                                 <AssistantMessageContent content={msg.content} />
                             )}
@@ -637,7 +814,33 @@ export const ChatPanel = ({
             </div>
 
             <div className="mt-auto px-1 pb-1">
-                <div className="relative">
+                <div className="relative" onDragOver={handleDragOver} onDrop={handleDrop}>
+                    {/* Attached files preview */}
+                    {attachedFiles.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-2 px-2">
+                            {attachedFiles.map((f, i) => (
+                                <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] text-foreground group">
+                                    {f.type.startsWith('image/') ? <Image className="w-3 h-3 text-primary shrink-0" /> : <FileCode className="w-3 h-3 text-primary shrink-0" />}
+                                    <span className="truncate max-w-[120px]">{f.name}</span>
+                                    <span className="text-muted text-[10px]">{formatFileSize(f.size)}</span>
+                                    <button onClick={() => removeAttachedFile(i)} className="p-0.5 rounded hover:bg-white/10 text-muted hover:text-foreground transition-colors opacity-0 group-hover:opacity-100">
+                                        <Trash2 className="w-2.5 h-2.5" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Hidden file input */}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.txt,.md,.log,.csv,.mcfunction,.js,.jsx,.mjs,.ts,.tsx,.java,.kt,.kts,.py,.yml,.yaml,.json,.xml,.gradle,.properties,.toml,.sh,.cfg,.conf,.ini"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                    />
+
                     <textarea
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
@@ -647,10 +850,21 @@ export const ChatPanel = ({
                                 handleSend();
                             }
                         }}
-                        placeholder={isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : "Describe what you want to build..."}
-                        className="neu-input w-full text-xs text-foreground rounded-2xl p-4 pr-12 outline-none transition-all resize-none h-20"
+                        placeholder={isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : attachedFiles.length > 0 ? "Add a message about the uploaded files..." : "Describe what you want to build..."}
+                        className="neu-input w-full text-xs text-foreground rounded-2xl p-4 pr-20 outline-none transition-all resize-none h-20"
                     />
                     <div className="absolute right-3 bottom-3 flex items-center gap-1.5 z-20">
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={loading || attachedFiles.length >= MAX_FILES}
+                            className={`p-1.5 rounded-lg transition-all ${loading || attachedFiles.length >= MAX_FILES
+                                ? 'text-faint'
+                                : 'text-muted hover:text-primary active:scale-95'
+                                }`}
+                            title="Attach files (images, code, text)"
+                        >
+                            <Paperclip className="w-3.5 h-3.5" />
+                        </button>
                         <button
                             onClick={handleEnhance}
                             disabled={loading || !prompt.trim()}
@@ -664,8 +878,8 @@ export const ChatPanel = ({
                         </button>
                         <button
                             onClick={() => handleSend()}
-                            disabled={loading || !prompt.trim()}
-                            className={`p-1.5 rounded-lg transition-all ${loading || !prompt.trim()
+                            disabled={loading || (!prompt.trim() && attachedFiles.length === 0)}
+                            className={`p-1.5 rounded-lg transition-all ${loading || (!prompt.trim() && attachedFiles.length === 0)
                                 ? 'text-faint bg-[hsl(var(--surface-sunk))]'
                                 : 'bg-foreground text-background hover:opacity-90 active:scale-95'
                                 }`}
