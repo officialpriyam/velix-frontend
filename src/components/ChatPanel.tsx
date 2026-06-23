@@ -96,6 +96,34 @@ export const ChatPanel = ({
 
     const statusLogKey = sessionId ? `velix_status_log_${sessionId}` : '';
     const generatedFilesKey = sessionId ? `velix_generated_files_${sessionId}` : '';
+    const messagesKey = sessionId ? `velix_messages_${sessionId}` : '';
+
+    // Detect generation mode from language (component-level for JSX access)
+    const isConfig = language?.startsWith('config-');
+    const isDatapack = language?.startsWith('datapack-');
+    const isScripting = language?.startsWith('scripting-');
+
+    useEffect(() => {
+        if (messagesKey && messages.length > 0) {
+            try {
+                localStorage.setItem(messagesKey, JSON.stringify(messages));
+            } catch {}
+        }
+    }, [messages, messagesKey]);
+
+    useEffect(() => {
+        if (messagesKey) {
+            try {
+                const saved = localStorage.getItem(messagesKey);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setMessages(parsed);
+                    }
+                }
+            } catch {}
+        }
+    }, [messagesKey]);
 
     useEffect(() => {
         if (statusLogKey && statusLog.length > 0) {
@@ -230,7 +258,26 @@ export const ChatPanel = ({
         }
 
         const skillLabel = platform === 'minecraft' ? 'Minecraft' : platform === 'discord' ? 'Discord' : platform === 'hytale' ? 'Hytale' : platform;
-        const platformLabel = platform === 'discord' ? 'Discord bot' : platform === 'hytale' ? 'Hytale Plugin' : 'Minecraft Plugin';
+        
+        let platformLabel = 'Minecraft Plugin';
+        let modeLabel = 'Plugin';
+        if (isConfig) {
+            const pluginName = language?.replace('config-', '').replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || 'Plugin';
+            platformLabel = `${pluginName} Config`;
+            modeLabel = 'Configuration';
+        } else if (isDatapack) {
+            platformLabel = 'Minecraft Datapack';
+            modeLabel = 'Datapack';
+        } else if (isScripting) {
+            platformLabel = 'Minecraft Commands';
+            modeLabel = 'Scripting';
+        } else if (platform === 'discord') {
+            platformLabel = 'Discord Bot';
+            modeLabel = 'Bot';
+        } else if (platform === 'hytale') {
+            platformLabel = 'Hytale Plugin';
+            modeLabel = 'Plugin';
+        }
 
         setStatusLog([
             { message: 'Analyzing request...', type: 'pending' }
@@ -239,12 +286,18 @@ export const ChatPanel = ({
 
         setStatusLog([
             { message: 'Analyzing request...', type: 'done' },
-            { message: `Loading ${skillLabel} skills...`, type: 'pending' }
+            { message: `Loading ${skillLabel} ${modeLabel.toLowerCase()} skills...`, type: 'pending' }
         ]);
         await new Promise(r => setTimeout(r, 400));
 
         const skillDetails: Record<string, string[]> = {
-            minecraft: ['Plugin Dev (Paper/Spigot)', 'Modding (NeoForge/Fabric)', 'Datapacks', 'Commands/Scripting'],
+            minecraft: isConfig
+                ? ['EssentialsX Ops', 'Server Admin', 'Config Generation']
+                : isDatapack
+                    ? ['Datapack Dev', 'Commands/Scripting', 'World Generation']
+                    : isScripting
+                        ? ['Commands/Scripting', 'Scoreboard', 'Execute Chains']
+                        : ['Plugin Dev (Paper/Spigot)', 'Modding (NeoForge/Fabric)', 'Datapacks', 'Commands/Scripting'],
             hytale: ['Plugin Basics', 'Custom Blocks', 'Custom Items', 'Custom Entities', 'Events API'],
             discord: ['Bot Framework', 'Commands', 'Events']
         };
@@ -252,7 +305,7 @@ export const ChatPanel = ({
 
         const logs: { message: string; type: 'pending' | 'done' | 'error' }[] = [
             { message: 'Analyzing request...', type: 'done' },
-            { message: `Loading ${skillLabel} skills...`, type: 'done' }
+            { message: `Loading ${skillLabel} ${modeLabel.toLowerCase()} skills...`, type: 'done' }
         ];
         for (const skill of skills.slice(0, 3)) {
             logs.push({ message: `  ${skill}`, type: 'pending' });
@@ -271,7 +324,7 @@ export const ChatPanel = ({
 
         let optimizedPrompt = finalPrompt;
         try {
-            const enhanceResult = await aiApi.enhancePrompt(finalPrompt, platform);
+            const enhanceResult = await aiApi.enhancePrompt(finalPrompt, platform, language);
             if (enhanceResult.enhanced && enhanceResult.enhanced !== finalPrompt) {
                 optimizedPrompt = enhanceResult.enhanced;
                 logs[logs.length - 1] = { message: `Prompt optimized`, type: 'done' };
@@ -283,7 +336,8 @@ export const ChatPanel = ({
         }
         setStatusLog([...logs]);
 
-        logs.push({ message: `Generating code...`, type: 'pending' });
+        const genLabel = isConfig ? 'Generating config...' : isDatapack ? 'Generating datapack...' : isScripting ? 'Generating commands...' : 'Generating code...';
+        logs.push({ message: genLabel, type: 'pending' });
         setStatusLog([...logs]);
 
         let result: any;
@@ -346,7 +400,7 @@ export const ChatPanel = ({
                 setStatusLog([...fileLogs]);
             }
 
-            fileLogs.push({ message: `${platformLabel} assembly complete!`, type: 'done' });
+            fileLogs.push({ message: `${platformLabel} ${modeLabel} assembly complete!`, type: 'done' });
             setStatusLog([...fileLogs]);
 
             setMessages(prev => [
@@ -379,7 +433,7 @@ export const ChatPanel = ({
                     }}
                     disabled={loading}
                     className="w-full bg-transparent border-0 px-5 pt-5 text-sm focus:outline-none resize-none h-[80px] placeholder:text-foreground/30 text-foreground"
-                    placeholder="Ask Velix to create a config about..."
+                    placeholder={isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : "Ask Velix to create a plugin about..."}
                 />
 
                 {statusLog.length > 0 && (
@@ -593,7 +647,7 @@ export const ChatPanel = ({
                                 handleSend();
                             }
                         }}
-                        placeholder="Describe what you want to build..."
+                        placeholder={isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : "Describe what you want to build..."}
                         className="neu-input w-full text-xs text-foreground rounded-2xl p-4 pr-12 outline-none transition-all resize-none h-20"
                     />
                     <div className="absolute right-3 bottom-3 flex items-center gap-1.5 z-20">

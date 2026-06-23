@@ -552,10 +552,12 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
                             <Code2 className="w-3.5 h-3.5" /> Code
                         </button>
                     </div>
-                    <button onClick={() => setActiveModal('compile')} disabled={compiling}
-                        className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg transition-all disabled:opacity-50 bg-foreground text-background hover:opacity-90">
-                        {compiling ? (<><div className="w-3 h-3 border-2 border-background/30 border-t-background rounded-full animate-spin" /> Building...</>) : (<><Hammer className="w-3.5 h-3.5" /> Compile</>)}
-                    </button>
+                    {!language?.startsWith('config-') && !language?.startsWith('datapack-') && !language?.startsWith('scripting-') && (
+                        <button onClick={() => setActiveModal('compile')} disabled={compiling}
+                            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg transition-all disabled:opacity-50 bg-foreground text-background hover:opacity-90">
+                            {compiling ? (<><div className="w-3 h-3 border-2 border-background/30 border-t-background rounded-full animate-spin" /> Building...</>) : (<><Hammer className="w-3.5 h-3.5" /> Compile</>)}
+                        </button>
+                    )}
                 </div>
                 {fileCount > 0 || creatingFile || creatingFolder ? (
                     <div className="flex-1 overflow-hidden flex flex-col">
