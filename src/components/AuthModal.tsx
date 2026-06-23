@@ -51,6 +51,7 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [providers, setProviders] = useState<OAuthProvider[]>([]);
+    const [oauthRedirectBaseUrl, setOauthRedirectBaseUrl] = useState<string>('');
 
     useEffect(() => {
         if (!isOpen) return;
@@ -69,6 +70,19 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
                 setProviders(list);
             })
             .catch(() => setProviders([]));
+
+        // Fetch OAuth redirect URL from backend site-status
+        const envRedirect = process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URL;
+        if (envRedirect) {
+            setOauthRedirectBaseUrl(envRedirect);
+        } else {
+            fetch('/api/auth/site-status')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.oauthRedirectUrl) setOauthRedirectBaseUrl(data.oauthRedirectUrl);
+                })
+                .catch(() => {});
+        }
     }, [isOpen]);
 
     if (!isOpen) return null;
@@ -104,7 +118,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
             return;
         }
 
-        const redirectUrl = encodeURIComponent(`${window.location.origin}/oauth-callback`);
+        const baseUrl = oauthRedirectBaseUrl || window.location.origin;
+        const redirectUrl = encodeURIComponent(`${baseUrl}/oauth-callback`);
         window.location.href = `${supabaseUrl}/auth/v1/authorize?provider=${provider}&redirect_to=${redirectUrl}`;
     };
 

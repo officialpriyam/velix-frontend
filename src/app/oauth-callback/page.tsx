@@ -9,14 +9,20 @@ export default function OAuthCallbackPage() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        let accessToken: string | null = null;
+
+        // Supabase returns tokens in the URL hash fragment (#access_token=...)
         const hash = window.location.hash;
-        if (!hash) {
-            const t = setTimeout(() => router.push('/'), 1500);
-            return () => clearTimeout(t);
+        if (hash) {
+            const hashParams = new URLSearchParams(hash.substring(1));
+            accessToken = hashParams.get('access_token');
         }
 
-        const params = new URLSearchParams(hash.substring(1));
-        const accessToken = params.get('access_token');
+        // Some providers may return tokens as query params (?access_token=...)
+        if (!accessToken) {
+            const searchParams = new URLSearchParams(window.location.search);
+            accessToken = searchParams.get('access_token');
+        }
 
         if (!accessToken) {
             setError('No access token found');
