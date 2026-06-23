@@ -23,12 +23,35 @@ export default function IdePage() {
     const initialPlatform = searchParams.get('platform');
     const [user, setUser] = useState<any>(null);
     const [activeModal, setActiveModal] = useState<ModalKind>(null);
+    const [accessChecked, setAccessChecked] = useState(false);
+    const [accessDenied, setAccessDenied] = useState(false);
 
     useEffect(() => {
         authApi.me()
-            .then((res: any) => { if (res.user) setUser(res.user); })
+            .then((res: any) => {
+                if (res.user) setUser(res.user);
+            })
             .catch(() => {});
     }, []);
+
+    // Check project access
+    useEffect(() => {
+        if (!id) return;
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/ai/projects/${id}/access`, { credentials: 'include' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.isPublic && data.role !== 'owner' && data.role !== 'editor') {
+                    // Public project — redirect to public view
+                    router.replace(`/pub/${id}`);
+                    return;
+                }
+                if (!data.accessible) {
+                    setAccessDenied(true);
+                }
+                setAccessChecked(true);
+            })
+            .catch(() => setAccessChecked(true));
+    }, [id, router]);
 
     const handleLogout = async () => {
         await authApi.logout();
@@ -37,6 +60,27 @@ export default function IdePage() {
     };
 
     if (!id) return null;
+
+    if (accessDenied) {
+        return (
+            <main className="flex h-screen bg-background text-foreground items-center justify-center">
+                <div className="text-center">
+                    <p className="text-sm text-muted mb-4">You don&apos;t have access to this project.</p>
+                    <button onClick={() => router.push('/')} className="px-4 py-2 text-xs font-bold bg-foreground text-background rounded-lg">
+                        Go Home
+                    </button>
+                </div>
+            </main>
+        );
+    }
+
+    if (!accessChecked) {
+        return (
+            <main className="flex h-screen bg-background text-foreground items-center justify-center">
+                <div className="text-sm text-muted animate-pulse">Checking access...</div>
+            </main>
+        );
+    }
 
     return (
         <main className="flex h-screen bg-background text-foreground overflow-hidden font-sans relative">

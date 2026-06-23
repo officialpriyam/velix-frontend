@@ -124,7 +124,7 @@ export default function Community() {
                                 {filteredProjects.map((project) => (
                                     <div
                                         key={project.id}
-                                        onClick={() => router.push(`/ide/${project.id}`)}
+                                        onClick={() => router.push(`/pub/${project.id}`)}
                                         className="group relative glass-card p-6 rounded-2xl border border-white/5 hover:border-[hsl(var(--text)/0.3)] transition-all duration-500 flex flex-col h-full hover:-translate-y-1 cursor-pointer"
                                     >
                                         {/* Language Badge */}
