@@ -55,15 +55,15 @@ export default function PublicProjectPage() {
         }
         setCloning(true);
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/ai/clone`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/ai/fork/${id}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ sourceId: id })
+                credentials: 'include'
             });
             const data = await res.json();
             if (data.newSessionId) {
                 router.push(`/ide/${data.newSessionId}`);
+            } else {
+                alert(data.error || 'Failed to clone project');
             }
         } catch {
             alert('Failed to clone project');
@@ -150,6 +150,11 @@ export default function PublicProjectPage() {
                     <div className="max-w-3xl mx-auto px-6 py-10">
                         {/* Project Info */}
                         <div className="glass-card rounded-2xl p-6 mb-6">
+                            {project?.thumbnail && (
+                                <div className="w-full h-48 rounded-xl overflow-hidden mb-4 border border-white/10">
+                                    <img src={project.thumbnail} alt={project.name} className="w-full h-full object-cover" />
+                                </div>
+                            )}
                             <h1 className="text-2xl font-black mb-2">{project?.name || 'Untitled Project'}</h1>
                             <div className="flex items-center gap-4 text-xs text-muted mb-4">
                                 <span className="flex items-center gap-1"><FileCode className="w-3.5 h-3.5" /> {langLabel}</span>

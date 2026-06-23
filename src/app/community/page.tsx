@@ -52,6 +52,10 @@ export default function Community() {
     }, []);
 
     const handleFork = async (sessionId: string) => {
+        if (!user) {
+            auth.setIsAuthOpen(true);
+            return;
+        }
         setForkingId(sessionId);
         try {
             const res = await aiApi.fork(sessionId);
@@ -132,8 +136,13 @@ export default function Community() {
                                             {project.language}
                                         </div>
 
-                                        <div className="w-14 h-14 rounded-2xl bg-[hsl(var(--primary)/0.15)] flex items-center justify-center mb-6 border border-[hsl(var(--text)/0.2)] shadow-inner group-hover:scale-110 transition-transform duration-500">
-                                            <Boxes className="w-7 h-7 text-primary" />
+                                        {/* Thumbnail / Icon */}
+                                        <div className="w-14 h-14 rounded-2xl overflow-hidden bg-[hsl(var(--primary)/0.15)] border border-[hsl(var(--text)/0.2)] shadow-inner group-hover:scale-110 transition-transform duration-500 flex items-center justify-center mb-6">
+                                            {project.thumbnail ? (
+                                                <img src={project.thumbnail} alt={project.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <Boxes className="w-7 h-7 text-primary" />
+                                            )}
                                         </div>
 
                                         <h3 className="text-xl font-black text-foreground mb-2 line-clamp-1 group-hover:text-primary transition-all duration-300">
