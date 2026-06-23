@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { FileText, AlertCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api';
 import { TopHeader, useAuth, SharedModals, Footer } from '@/components/AppShell';
 
@@ -15,6 +16,7 @@ interface Transaction {
 }
 
 export default function CreditsPage() {
+    const router = useRouter();
     const auth = useAuth();
     const { user, setUser, logout } = auth;
 
@@ -28,6 +30,9 @@ export default function CreditsPage() {
                 const profileResult = await authApi.me();
                 if (profileResult.user) {
                     setUser(profileResult.user);
+                } else {
+                    router.push('/');
+                    return;
                 }
 
                 const creditsResult = await authApi.getCredits();
@@ -35,7 +40,7 @@ export default function CreditsPage() {
                     setTransactions(creditsResult.transactions);
                 }
             } catch (err) {
-                console.error("Failed to load credits history:", err);
+                router.push('/');
             } finally {
                 setLoading(false);
             }

@@ -510,7 +510,11 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
         }
     };
 
-    const shareLink = typeof window !== 'undefined' ? `${window.location.origin}/ide/${sessionId}` : '';
+    const shareLink = typeof window !== 'undefined'
+        ? isPublic
+            ? `${window.location.origin}/pub/${sessionId}`
+            : `${window.location.origin}/ide/${sessionId}`
+        : '';
     const handleCopyLink = async () => { if (await copyToClipboard(shareLink)) { setCopied(true); setTimeout(() => setCopied(false), 1500); } };
 
     const fileCount = Object.keys(files).length;

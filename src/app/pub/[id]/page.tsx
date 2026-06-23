@@ -73,6 +73,7 @@ export default function PublicProjectPage() {
     };
 
     const handleMakePrivate = async () => {
+        if (!user) { router.push('/'); return; }
         try {
             await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/ai/projects/${id}/visibility`, {
                 method: 'PATCH',

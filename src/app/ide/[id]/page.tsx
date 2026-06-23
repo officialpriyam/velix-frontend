@@ -30,8 +30,9 @@ export default function IdePage() {
         authApi.me()
             .then((res: any) => {
                 if (res.user) setUser(res.user);
+                else router.push('/');
             })
-            .catch(() => {});
+            .catch(() => { router.push('/'); });
     }, []);
 
     // Check project access
