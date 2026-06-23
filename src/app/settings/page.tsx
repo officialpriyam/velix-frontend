@@ -142,6 +142,7 @@ export default function SettingsPage() {
     };
 
     const handleDeleteAccount = async () => {
+        if (!user?.id) return;
         if (!confirm("WARNING: Are you sure you want to delete your account permanently? This action is irreversible and all your sandboxes will be cleaned up.")) return;
         try {
             const res = await fetch(`/api/admin/users/${user.id}`, {
