@@ -1,5 +1,12 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+  description: "Velix Privacy Policy — how we collect, use, and protect your data on the AI code generation platform.",
+  robots: { index: true, follow: true },
+};
 
 export default function PrivacyPage() {
     return (

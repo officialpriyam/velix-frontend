@@ -1,5 +1,12 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Cookie Policy",
+  description: "Velix Cookie Policy — how we use cookies and similar technologies on the AI code generation platform.",
+  robots: { index: true, follow: true },
+};
 
 export default function CookiesPage() {
     return (
