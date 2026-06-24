@@ -63,7 +63,9 @@ export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
                     maxMinutes
                 })
             });
-            const data = await res.json();
+            const text = await res.text();
+            let data: any;
+            try { data = JSON.parse(text); } catch { data = { error: text.slice(0, 200) || 'Server returned non-JSON response' }; }
 
             if (data.error) {
                 addLog(`ERROR: ${data.error}`);
@@ -92,7 +94,9 @@ export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
             pollRef.current = setInterval(async () => {
                 try {
                     const logRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/ai/bot/logs/${sessionId}`, { credentials: 'include' });
-                    const logData = await logRes.json();
+                    const logText = await logRes.text();
+                    let logData: any;
+                    try { logData = JSON.parse(logText); } catch { return; }
                     if (logData.logs && logData.logs.length > 0) {
                         setLogs(prev => {
                             const existing = new Set(prev);
