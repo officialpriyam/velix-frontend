@@ -229,6 +229,8 @@ export const ChatPanel = ({
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
         }
+        setLoading(false);
+        setStatusLog([{ message: 'Generation stopped by user', type: 'error' }]);
     };
 
     useEffect(() => {
