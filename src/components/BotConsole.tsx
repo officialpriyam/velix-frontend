@@ -14,7 +14,6 @@ type BotStatus = 'idle' | 'starting' | 'running' | 'stopping' | 'error';
 export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
     const [status, setStatus] = useState<BotStatus>('idle');
     const [logs, setLogs] = useState<string[]>([]);
-    const [botToken, setBotToken] = useState('');
     const [showTokenInput, setShowTokenInput] = useState(true);
     const [timeLeft, setTimeLeft] = useState(0);
     const [maxMinutes, setMaxMinutes] = useState(10);
@@ -47,14 +46,10 @@ export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
     };
 
     const startBot = async () => {
-        if (!botToken.trim()) {
-            addLog('ERROR: Bot token is required');
-            return;
-        }
-
         setStatus('starting');
         setShowTokenInput(false);
         addLog('Starting bot session...');
+        addLog('Reading token from .env file...');
         addLog(`Session limit: ${maxMinutes} minutes`);
 
         try {
@@ -64,7 +59,6 @@ export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
                 credentials: 'include',
                 body: JSON.stringify({
                     sessionId,
-                    botToken: botToken.trim(),
                     language,
                     maxMinutes
                 })
@@ -201,25 +195,24 @@ export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
                 <span className="flex items-center gap-1"><Bot className="w-3 h-3" /> Live Discord bot</span>
             </div>
 
-            {/* Token input */}
+            {/* Session config */}
             {showTokenInput && (
                 <div className="px-4 py-3 border-b border-[hsl(var(--surface-sunk))]">
-                    <label className="text-[11px] font-bold text-muted mb-1.5 block">Bot Token</label>
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="password"
-                            value={botToken}
-                            onChange={(e) => setBotToken(e.target.value)}
-                            placeholder="Paste your Discord bot token..."
-                            className="flex-1 px-3 py-2 text-xs font-mono rounded-lg bg-[hsl(var(--surface-sunk))] border border-white/10 text-foreground placeholder:text-muted focus:outline-none focus:border-primary/50"
-                        />
-                        <select value={maxMinutes} onChange={(e) => setMaxMinutes(Number(e.target.value))}
-                            className="px-2 py-2 text-xs rounded-lg bg-[hsl(var(--surface-sunk))] border border-white/10 text-foreground">
-                            <option value={5}>5 min</option>
-                            <option value={10}>10 min</option>
-                            <option value={15}>15 min</option>
-                            <option value={20}>20 min</option>
-                        </select>
+                    <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                            <label className="text-[11px] font-bold text-muted mb-1.5 block">Session Duration</label>
+                            <select value={maxMinutes} onChange={(e) => setMaxMinutes(Number(e.target.value))}
+                                className="px-3 py-2 text-xs rounded-lg bg-[hsl(var(--surface-sunk))] border border-white/10 text-foreground">
+                                <option value={5}>5 minutes</option>
+                                <option value={10}>10 minutes</option>
+                                <option value={15}>15 minutes</option>
+                                <option value={20}>20 minutes</option>
+                            </select>
+                        </div>
+                        <div className="flex-1 text-[11px] text-muted">
+                            <p>Token is read from the <code className="px-1 py-0.5 rounded bg-white/5 font-mono">.env</code> file in your project.</p>
+                            <p className="mt-1">Make sure <code className="px-1 py-0.5 rounded bg-white/5 font-mono">DISCORD_TOKEN=your_token</code> is set.</p>
+                        </div>
                     </div>
                 </div>
             )}
