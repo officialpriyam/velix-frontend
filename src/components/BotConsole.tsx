@@ -49,8 +49,8 @@ export function BotConsole({ sessionId, language, onClose, onFixWithAI }: BotCon
                 const logText = await logRes.text();
                 let logData: any;
                 try { logData = JSON.parse(logText); } catch { return; }
-                if (logData.status === 'running') {
-                    setStatus('running');
+                if (logData.status === 'running' || logData.status === 'starting') {
+                    setStatus(logData.status === 'running' ? 'running' : 'starting');
                     setShowTokenInput(false);
                     if (logData.logs && logData.logs.length > 0) {
                         setLogs(logData.logs);
@@ -67,6 +67,9 @@ export function BotConsole({ sessionId, language, onClose, onFixWithAI }: BotCon
                                     const newLogs = d.logs.filter((l: string) => !existing.has(l));
                                     return newLogs.length > 0 ? [...prev, ...newLogs] : prev;
                                 });
+                            }
+                            if (d.status === 'running' && status !== 'running') {
+                                setStatus('running');
                             }
                             if (d.status === 'stopped' || d.status === 'error') {
                                 setStatus(d.status === 'error' ? 'error' : 'idle');
@@ -129,22 +132,8 @@ export function BotConsole({ sessionId, language, onClose, onFixWithAI }: BotCon
                 return;
             }
 
-            setStatus('running');
-            addLog('Bot process started successfully');
-            addLog('Connecting to Discord gateway...');
+            setStatus('starting');
             setTimeLeft(maxMinutes * 60);
-
-            // Start countdown timer
-            timerRef.current = setInterval(() => {
-                setTimeLeft(prev => {
-                    if (prev <= 1) {
-                        addLog('Session time limit reached. Stopping bot...');
-                        stopBot();
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
 
             // Poll for logs
             pollRef.current = setInterval(async () => {
@@ -159,6 +148,24 @@ export function BotConsole({ sessionId, language, onClose, onFixWithAI }: BotCon
                             const newLogs = logData.logs.filter((l: string) => !existing.has(l));
                             return newLogs.length > 0 ? [...prev, ...newLogs] : prev;
                         });
+                    }
+                    // Update status from server
+                    if (logData.status === 'running' && status !== 'running') {
+                        setStatus('running');
+                        addLog('Bot process started successfully');
+                        addLog('Connecting to Discord gateway...');
+                        setTimeLeft(maxMinutes * 60);
+                        // Start countdown timer
+                        timerRef.current = setInterval(() => {
+                            setTimeLeft(prev => {
+                                if (prev <= 1) {
+                                    addLog('Session time limit reached. Stopping bot...');
+                                    stopBot();
+                                    return 0;
+                                }
+                                return prev - 1;
+                            });
+                        }, 1000);
                     }
                     if (logData.status === 'stopped' || logData.status === 'error') {
                         setStatus(logData.status === 'error' ? 'error' : 'idle');
@@ -209,7 +216,7 @@ export function BotConsole({ sessionId, language, onClose, onFixWithAI }: BotCon
 
     const statusLabels: Record<BotStatus, string> = {
         idle: 'IDLE',
-        starting: 'STARTING',
+        starting: 'INSTALLING',
         running: 'RUNNING',
         stopping: 'STOPPING',
         error: 'ERROR'
