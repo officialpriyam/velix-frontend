@@ -459,6 +459,7 @@ export const ChatPanel = ({
             logs.push({ message: `  ${skill}`, type: 'pending' });
             setStatusLog([...logs]);
             await new Promise(r => setTimeout(r, 200));
+            if (controller.signal.aborted) { setLoading(false); return; }
             logs[logs.length - 1] = { message: `  ${skill}`, type: 'done' };
             setStatusLog([...logs]);
         }
@@ -472,14 +473,15 @@ export const ChatPanel = ({
 
         let optimizedPrompt = finalPrompt;
         try {
-            const enhanceResult = await aiApi.enhancePrompt(finalPrompt, platform, language);
+            const enhanceResult = await aiApi.enhancePrompt(finalPrompt, platform, language, controller.signal);
             if (enhanceResult.enhanced && enhanceResult.enhanced !== finalPrompt) {
                 optimizedPrompt = enhanceResult.enhanced;
                 logs[logs.length - 1] = { message: `Prompt optimized`, type: 'done' };
             } else {
                 logs[logs.length - 1] = { message: `Prompt ready`, type: 'done' };
             }
-        } catch {
+        } catch (enhanceErr: any) {
+            if (enhanceErr.name === 'AbortError') { setLoading(false); return; }
             logs[logs.length - 1] = { message: `Using original prompt`, type: 'done' };
         }
         setStatusLog([...logs]);
@@ -830,7 +832,16 @@ export const ChatPanel = ({
             </div>
 
             <div className="mt-auto px-1 pb-1">
-                <div className="relative" onDragOver={handleDragOver} onDrop={handleDrop}>
+                <div className={`relative rounded-2xl transition-all duration-500 ${loading ? 'p-[1px]' : ''}`} onDragOver={handleDragOver} onDrop={handleDrop}>
+                    {/* Glowing rotating border during generation */}
+                    {loading && (
+                        <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+                            <div className="absolute inset-[-50%] animate-[spin_3s_linear_infinite]" style={{
+                                background: 'conic-gradient(from 0deg, transparent, hsl(var(--primary)), transparent, hsl(var(--primary)), transparent)',
+                            }} />
+                        </div>
+                    )}
+                    <div className={`relative ${loading ? 'm-[1px] rounded-[15px] bg-[hsl(var(--surface))]' : ''}`}>
                     {/* Attached files preview */}
                     {attachedFiles.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-2 px-2">
@@ -909,6 +920,7 @@ export const ChatPanel = ({
                                 <Send className="w-3.5 h-3.5" />
                             )}
                         </button>
+                    </div>
                     </div>
                 </div>
             </div>

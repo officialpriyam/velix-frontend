@@ -108,12 +108,13 @@ export const aiApi = {
         });
         return safeJson(res);
     },
-    enhancePrompt: async (prompt: string, platform?: string, language?: string) => {
+    enhancePrompt: async (prompt: string, platform?: string, language?: string, signal?: AbortSignal) => {
         const res = await fetch(`${BASE_URL}/ai/enhance-prompt`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ prompt, platform, language })
+            body: JSON.stringify({ prompt, platform, language }),
+            signal
         });
         return safeJson(res);
     },
