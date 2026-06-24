@@ -114,6 +114,8 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
     const [sessionName, setSessionName] = useState<string>('');
     const [isPublic, setIsPublic] = useState<boolean>(false);
     const [copied, setCopied] = useState(false);
+    const [shareToken, setShareToken] = useState<string | null>(null);
+    const [shareTokenCopied, setShareTokenCopied] = useState(false);
     const [fileTab, setFileTab] = useState<'files' | 'code'>('files');
     const [selectedCompiler, setSelectedCompiler] = useState<string>('javac');
 
@@ -238,6 +240,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
                     else if (incomingModel) setModel(incomingModel);
                     if (project.name) setSessionName(project.name);
                     setIsPublic(project.is_public === 1 || project.is_public === true);
+                    if (project.share_token) setShareToken(project.share_token);
                 } else if (incomingModel) {
                     setModel(incomingModel);
                 }
@@ -432,6 +435,37 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
         const next = !isPublic;
         setIsPublic(next);
         try { await aiApi.toggleVisibility(sessionId, next); } catch { setIsPublic(!next); showNotification('Failed to update visibility.', 'error'); }
+    };
+
+    const handleToggleShareToken = async () => {
+        if (shareToken) {
+            try {
+                await aiApi.removeShareToken(sessionId);
+                setShareToken(null);
+                showNotification('Private link removed.', 'success');
+            } catch {
+                showNotification('Failed to remove link.', 'error');
+            }
+        } else {
+            try {
+                const res = await aiApi.generateShareToken(sessionId);
+                if (res.token) {
+                    setShareToken(res.token);
+                    showNotification('Private link generated.', 'success');
+                }
+            } catch {
+                showNotification('Failed to generate link.', 'error');
+            }
+        }
+    };
+
+    const handleCopyShareToken = async () => {
+        if (!shareToken) return;
+        const url = `${window.location.origin}/s/${shareToken}`;
+        if (await copyToClipboard(url)) {
+            setShareTokenCopied(true);
+            setTimeout(() => setShareTokenCopied(false), 1500);
+        }
     };
 
     const handleSaveSettings = async () => {
@@ -959,13 +993,21 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
                                         <Link2 className="w-4 h-4 text-muted" />
                                         <div>
                                             <div className="text-xs font-semibold text-foreground">Private Link</div>
-                                            <div className="text-[11px] text-muted">Generate a private sharing link</div>
+                                            <div className="text-[11px] text-muted">{shareToken ? 'Anyone with this link can view' : 'Generate a private sharing link'}</div>
                                         </div>
                                     </div>
-                                    <button className="relative h-6 w-11 rounded-full neu-inset border border-[hsl(var(--surface-sunk))]">
-                                        <span className="absolute top-0.5 h-5 w-5 neu-raised rounded-full left-0.5" />
+                                    <button onClick={handleToggleShareToken} className={`relative h-6 w-11 rounded-full transition-all ${shareToken ? 'bg-primary' : 'neu-inset border border-[hsl(var(--surface-sunk))]'}`}>
+                                        <span className={`absolute top-0.5 h-5 w-5 neu-raised rounded-full transition-all ${shareToken ? 'left-[22px]' : 'left-0.5'}`} />
                                     </button>
                                 </div>
+                                {shareToken && (
+                                    <div className="mt-3 flex items-center gap-2">
+                                        <span className="flex-1 truncate font-mono text-[11px] text-muted">{`${typeof window !== 'undefined' ? window.location.origin : ''}/s/${shareToken}`}</span>
+                                        <button onClick={handleCopyShareToken} className="neu-button px-2.5 py-1.5 text-[11px] text-foreground flex items-center gap-1 rounded-lg shrink-0">
+                                            {shareTokenCopied ? <><Check className="w-3 h-3 text-success" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

@@ -61,6 +61,24 @@ export const aiApi = {
         });
         return safeJson(res);
     },
+    generateShareToken: async (sessionId: string) => {
+        const res = await fetch(`${BASE_URL}/ai/projects/${sessionId}/share-token`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        return safeJson(res);
+    },
+    removeShareToken: async (sessionId: string) => {
+        const res = await fetch(`${BASE_URL}/ai/projects/${sessionId}/share-token`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        return safeJson(res);
+    },
+    getSharedProject: async (token: string) => {
+        const res = await fetch(`${BASE_URL}/ai/shared/${token}`, { credentials: 'include' });
+        return safeJson(res);
+    },
     renameProject: async (sessionId: string, name: string) => {
         const res = await fetch(`${BASE_URL}/ai/projects/${sessionId}`, {
             method: 'PATCH',
