@@ -11,7 +11,7 @@ import { authApi } from '@/lib/api';
 import { WorkspaceView } from '@/components/workspace/WorkspaceView';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
-type ModalKind = null | 'settings' | 'history' | 'deps' | 'share' | 'compile' | 'clone' | 'wiki';
+type ModalKind = null | 'settings' | 'history' | 'deps' | 'share' | 'compile' | 'clone' | 'wiki' | 'botconsole';
 
 export default function IdePage() {
     const { id } = useParams();

@@ -33,6 +33,11 @@ import {
     RefreshCw,
     Link2,
     RotateCcw,
+    Terminal,
+    Play,
+    Square as StopIcon,
+    Bot,
+    ChevronDown,
 } from 'lucide-react';
 import { fileApi, compilerApi, aiApi, versionsApi, dependenciesApi, copyToClipboard } from '@/lib/api';
 import { ChatPanel, BuildResult } from '@/components/ChatPanel';
@@ -40,6 +45,7 @@ import { FileTree } from '@/components/FileTree';
 import { Editor } from '@/components/Editor';
 import { useNotification } from '@/components/Notification';
 import { WikiModal } from '@/components/WikiModal';
+import { BotConsole } from '@/components/BotConsole';
 
 interface WorkspaceViewProps {
     sessionId: string;
@@ -52,7 +58,7 @@ interface WorkspaceViewProps {
     onSetActiveModal?: (modal: ModalKind) => void;
 }
 
-type ModalKind = null | 'settings' | 'history' | 'deps' | 'share' | 'compile' | 'clone' | 'wiki';
+type ModalKind = null | 'settings' | 'history' | 'deps' | 'share' | 'compile' | 'clone' | 'wiki' | 'botconsole';
 type SettingsTab = 'overview' | 'details' | 'team' | 'ai-model' | 'generation' | 'history' | 'knowledge' | 'compilation' | 'download';
 
 const COMPILERS = [
@@ -591,10 +597,17 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
                         </button>
                     </div>
                     {!language?.startsWith('config-') && !language?.startsWith('datapack-') && !language?.startsWith('scripting-') && (
-                        <button onClick={() => setActiveModal('compile')} disabled={compiling}
-                            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg transition-all disabled:opacity-50 bg-foreground text-background hover:opacity-90">
-                            {compiling ? (<><div className="w-3 h-3 border-2 border-background/30 border-t-background rounded-full animate-spin" /> Building...</>) : (<><Hammer className="w-3.5 h-3.5" /> Compile</>)}
-                        </button>
+                        platform === 'discord' ? (
+                            <button onClick={() => setActiveModal('botconsole')}
+                                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg transition-all bg-foreground text-background hover:opacity-90">
+                                <Terminal className="w-3.5 h-3.5" /> Terminal
+                            </button>
+                        ) : (
+                            <button onClick={() => setActiveModal('compile')} disabled={compiling}
+                                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg transition-all disabled:opacity-50 bg-foreground text-background hover:opacity-90">
+                                {compiling ? (<><div className="w-3 h-3 border-2 border-background/30 border-t-background rounded-full animate-spin" /> Building...</>) : (<><Hammer className="w-3.5 h-3.5" /> Compile</>)}
+                            </button>
+                        )
                     )}
                 </div>
                 {fileCount > 0 || creatingFile || creatingFolder ? (
@@ -705,6 +718,15 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
                                 ))}
                             </div>
                         )}
+                    </div>
+                </ModalOverlay>
+            )}
+
+            {/* Bot Console Modal */}
+            {activeModal === 'botconsole' && (
+                <ModalOverlay onClose={() => setActiveModal(null)}>
+                    <div className="w-full max-w-3xl neu-card animate-scale-in overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <BotConsole sessionId={sessionId} language={language || 'python'} onClose={() => setActiveModal(null)} />
                     </div>
                 </ModalOverlay>
             )}
