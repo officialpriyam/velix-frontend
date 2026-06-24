@@ -106,8 +106,11 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
     const [files, setFiles] = useState<{ [path: string]: string }>({});
     const [selectedFile, setSelectedFile] = useState<string | null>(null);
     const [compiling, setCompiling] = useState(false);
-    const [language, setLanguage] = useState(incomingLanguage);
-    const [platform, setPlatform] = useState(incomingPlatform);
+
+    // Restore platform/language from localStorage if URL params missing
+    const savedPrefs = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('velix_session_prefs') || '{}') : {};
+    const [language, setLanguage] = useState(incomingLanguage !== 'java' ? incomingLanguage : (savedPrefs.language || incomingLanguage));
+    const [platform, setPlatform] = useState(incomingPlatform !== 'minecraft' ? incomingPlatform : (savedPrefs.platform || incomingPlatform));
     const [initialPrompt, setInitialPrompt] = useState<string | null>(incomingPrompt);
     const [model, setModel] = useState<string>(incomingModel || 'anthropic/claude-3-sonnet');
     const [models, setModels] = useState<{ id: string; name: string }[]>([]);
@@ -222,6 +225,13 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
             if (Array.isArray(data)) setModels(data);
         }).catch(err => console.error("Failed to fetch models", err));
     }, []);
+
+    // Persist platform/language to localStorage so refresh doesn't reset them
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('velix_session_prefs', JSON.stringify({ platform, language }));
+        }
+    }, [platform, language]);
 
     useEffect(() => {
         const jvs = compilerApi.getJavaVersions();
