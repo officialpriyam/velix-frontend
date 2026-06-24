@@ -443,6 +443,19 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
         setInitialPrompt(prompt);
     };
 
+    const handleBotFix = (error: string) => {
+        setActiveModal(null);
+        const fileContext = Object.entries(files)
+            .filter(([path, content]) => content && !path.endsWith('/'))
+            .slice(0, 10)
+            .map(([path, content]) => `=== FILE: ${path} ===\n${content}`)
+            .join('\n\n');
+        const prompt = fileContext
+            ? `My Discord bot failed to start with the following error. Analyze the error and fix ALL files so the bot runs correctly.\n\nBOT ERROR:\n\`\`\`\n${error}\n\`\`\`\n\nEXISTING SOURCE FILES:\n\`\`\`\n${fileContext}\n\`\`\`\n\nFix the code and regenerate all files. Do NOT change the project structure or features — only fix the error.`
+            : `My Discord bot failed to start with the following error. Analyze the error and fix the code so the bot runs correctly.\n\nBOT ERROR:\n\`\`\`\n${error}\n\`\`\`\n\nFix the code and regenerate all files.`;
+        setInitialPrompt(prompt);
+    };
+
     const handleClone = async () => {
         if (!sessionId || cloning) return;
         setCloning(true);
@@ -767,7 +780,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
             {activeModal === 'botconsole' && (
                 <ModalOverlay onClose={() => setActiveModal(null)}>
                     <div className="w-full max-w-3xl neu-card animate-scale-in overflow-hidden" onClick={e => e.stopPropagation()}>
-                        <BotConsole sessionId={sessionId} language={language || 'python'} onClose={() => setActiveModal(null)} />
+                        <BotConsole sessionId={sessionId} language={language || 'python'} onClose={() => setActiveModal(null)} onFixWithAI={handleBotFix} />
                     </div>
                 </ModalOverlay>
             )}

@@ -1,17 +1,18 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Play, Square, Bot, X, Clock, Activity, ChevronDown } from 'lucide-react';
+import { Terminal, Play, Square, Bot, X, Clock, Activity, ChevronDown, Wrench } from 'lucide-react';
 
 interface BotConsoleProps {
     sessionId: string;
     language: string;
     onClose: () => void;
+    onFixWithAI?: (error: string) => void;
 }
 
 type BotStatus = 'idle' | 'starting' | 'running' | 'stopping' | 'error';
 
-export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
+export function BotConsole({ sessionId, language, onClose, onFixWithAI }: BotConsoleProps) {
     const [status, setStatus] = useState<BotStatus>(() => {
         try { return (localStorage.getItem(`velix_bot_status_${sessionId}`) as BotStatus) || 'idle'; } catch { return 'idle'; }
     });
@@ -21,6 +22,7 @@ export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
     const [showTokenInput, setShowTokenInput] = useState(true);
     const [timeLeft, setTimeLeft] = useState(0);
     const [maxMinutes, setMaxMinutes] = useState(10);
+    const [lastError, setLastError] = useState('');
     const logRef = useRef<HTMLDivElement>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -68,6 +70,10 @@ export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
                             }
                             if (d.status === 'stopped' || d.status === 'error') {
                                 setStatus(d.status === 'error' ? 'error' : 'idle');
+                                if (d.status === 'error') {
+                                    const errLogs = d.logs?.filter((l: string) => l.includes('[ERR]')) || [];
+                                    setLastError(errLogs.length > 0 ? errLogs[errLogs.length - 1].replace(/^\[.*?\]\s*\[ERR\]\s*/, '') : 'Bot process failed');
+                                }
                                 if (timerRef.current) clearInterval(timerRef.current);
                                 if (pollRef.current) clearInterval(pollRef.current);
                             }
@@ -118,6 +124,7 @@ export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
 
             if (data.error) {
                 addLog(`ERROR: ${data.error}`);
+                setLastError(data.error);
                 setStatus('error');
                 return;
             }
@@ -156,6 +163,10 @@ export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
                     if (logData.status === 'stopped' || logData.status === 'error') {
                         setStatus(logData.status === 'error' ? 'error' : 'idle');
                         addLog('Bot process ended');
+                        if (logData.status === 'error') {
+                            const errLogs = logData.logs?.filter((l: string) => l.includes('[ERR]')) || [];
+                            setLastError(errLogs.length > 0 ? errLogs[errLogs.length - 1].replace(/^\[.*?\]\s*\[ERR\]\s*/, '') : 'Bot process failed');
+                        }
                         if (timerRef.current) clearInterval(timerRef.current);
                         if (pollRef.current) clearInterval(pollRef.current);
                     }
@@ -164,6 +175,7 @@ export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
 
         } catch (err: any) {
             addLog(`ERROR: ${err.message || 'Failed to start bot'}`);
+            setLastError(err.message || 'Failed to start bot');
             setStatus('error');
         }
     };
@@ -224,6 +236,12 @@ export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
                     )}
                 </div>
                 <div className="flex items-center gap-2">
+                    {status === 'error' && onFixWithAI && (
+                        <button onClick={() => onFixWithAI(lastError || 'Bot process failed')}
+                            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg bg-primary text-white hover:opacity-90 transition-all">
+                            <Wrench className="w-3.5 h-3.5" /> Fix with AI
+                        </button>
+                    )}
                     {status === 'idle' || status === 'error' ? (
                         <button onClick={startBot}
                             className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg bg-green-600 text-white hover:bg-green-700 transition-all">
