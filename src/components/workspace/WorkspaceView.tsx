@@ -287,19 +287,25 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
     };
 
     const handleCodeGenerated = (_: string, result: any) => {
-        const fileMap: { [path: string]: string } = {};
         if (result.files && Array.isArray(result.files)) {
-            result.files.forEach((f: any) => { fileMap[f.path.replace(/\\/g, '/')] = f.content; });
+            setFiles(prev => {
+                const updated = { ...prev };
+                result.files.forEach((f: any) => { updated[f.path.replace(/\\/g, '/')] = f.content; });
+                return updated;
+            });
+            if (result.files?.length > 0 && !selectedFile) setSelectedFile(result.files[0].path);
         }
-        setFiles(fileMap);
-        if (result.files?.length > 0 && !selectedFile) setSelectedFile(result.files[0].path);
         setTimeout(() => loadVersionStats(), 1000);
     };
 
+    const selectedFileRef = useRef(selectedFile);
+    selectedFileRef.current = selectedFile;
+
     const handleSaveFile = async (content: string) => {
-        if (!selectedFile || !sessionId) return;
-        setFiles(prev => ({ ...prev, [selectedFile]: content }));
-        await fileApi.saveFiles(sessionId, { [selectedFile]: content }).catch(() => {
+        const currentFile = selectedFileRef.current;
+        if (!currentFile || !sessionId) return;
+        setFiles(prev => ({ ...prev, [currentFile]: content }));
+        await fileApi.saveFiles(sessionId, { [currentFile]: content }).catch(() => {
             showNotification('Auto-save failed.', 'error');
         });
     };
@@ -373,8 +379,19 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
         if (!sessionId || !confirm(`Delete ${path}?`)) return;
         try {
             await fileApi.delete(sessionId, path);
-            setFiles(prev => { const n = { ...prev }; delete n[path]; return n; });
-            if (selectedFile === path) setSelectedFile(null);
+            setFiles(prev => {
+                const n = { ...prev };
+                // Remove the file and any children if it's a folder
+                Object.keys(n).forEach(key => {
+                    if (key === path || key.startsWith(path + '/') || key.startsWith(path + '\\')) {
+                        delete n[key];
+                    }
+                });
+                return n;
+            });
+            if (selectedFile === path || selectedFile?.startsWith(path + '/') || selectedFile?.startsWith(path + '\\')) {
+                setSelectedFile(null);
+            }
         } catch { alert("Failed to delete"); }
     };
 
@@ -384,8 +401,22 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
         if (!newName || newName === oldPath) return;
         try {
             await fileApi.rename(sessionId, oldPath, newName);
-            setFiles(prev => { const n = { ...prev }; const c = n[oldPath]; delete n[oldPath]; n[newName] = c; return n; });
+            setFiles(prev => {
+                const n: Record<string, string> = {};
+                Object.entries(prev).forEach(([key, val]) => {
+                    if (key === oldPath) n[newName] = val;
+                    else if (key.startsWith(oldPath + '/') || key.startsWith(oldPath + '\\')) {
+                        n[key.replace(oldPath, newName)] = val;
+                    } else {
+                        n[key] = val;
+                    }
+                });
+                return n;
+            });
             if (selectedFile === oldPath) setSelectedFile(newName);
+            else if (selectedFile?.startsWith(oldPath + '/') || selectedFile?.startsWith(oldPath + '\\')) {
+                setSelectedFile(selectedFile.replace(oldPath, newName));
+            }
         } catch { alert("Failed to rename"); }
     };
 
