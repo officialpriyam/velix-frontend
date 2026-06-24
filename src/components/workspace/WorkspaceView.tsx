@@ -438,8 +438,8 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
             .map(([path, content]) => `=== FILE: ${path} ===\n${content}`)
             .join('\n\n');
         const prompt = fileContext
-            ? `The following code has a compilation error. Analyze the error and fix ALL files so it compiles correctly.\n\nCOMPILATION ERROR:\n\`\`\`\n${error}\n\`\`\`\n\nEXISTING SOURCE FILES:\n\`\`\`\n${fileContext}\n\`\`\`\n\nFix the code and regenerate all files. Do NOT change the project structure or features — only fix compilation errors.`
-            : `The following code has a compilation error. Analyze the error and fix the code so it compiles correctly.\n\nCOMPILATION ERROR:\n\`\`\`\n${error}\n\`\`\`\n\nFix the code and regenerate all files.`;
+            ? `You are a senior software engineer. A compilation error has occurred. Your task is to fix ONLY the specific file(s) causing the error.\n\nSTEPS:\n1. Read the error message carefully and identify the exact file and line causing the issue.\n2. Analyze the root cause — do NOT guess.\n3. Edit ONLY the affected file(s) with minimal, precise changes.\n4. Do NOT rewrite entire files. Do NOT add new features. Do NOT change unrelated code.\n5. Preserve all existing functionality — only fix what is broken.\n\nERROR:\n\`\`\`\n${error}\n\`\`\`\n\nEXISTING SOURCE FILES:\n\`\`\`\n${fileContext}\n\`\`\`\n\nOutput the fix as a single FILE: line with ONLY the changes needed. If you must rewrite a file, include the full file but keep changes minimal.`
+            : `You are a senior software engineer. A compilation error has occurred. Your task is to fix the specific file causing the error.\n\nSTEPS:\n1. Read the error message carefully and identify the exact file and line.\n2. Analyze the root cause.\n3. Edit ONLY the affected file with minimal, precise changes.\n4. Do NOT rewrite entire files. Do NOT add new features.\n\nERROR:\n\`\`\`\n${error}\n\`\`\`\n\nOutput the fix as a single FILE: line with ONLY the changes needed.`;
         setInitialPrompt(prompt);
     };
 
@@ -451,8 +451,8 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
             .map(([path, content]) => `=== FILE: ${path} ===\n${content}`)
             .join('\n\n');
         const prompt = fileContext
-            ? `My Discord bot failed to start with the following error. Analyze the error and fix ALL files so the bot runs correctly.\n\nBOT ERROR:\n\`\`\`\n${error}\n\`\`\`\n\nEXISTING SOURCE FILES:\n\`\`\`\n${fileContext}\n\`\`\`\n\nFix the code and regenerate all files. Do NOT change the project structure or features — only fix the error.`
-            : `My Discord bot failed to start with the following error. Analyze the error and fix the code so the bot runs correctly.\n\nBOT ERROR:\n\`\`\`\n${error}\n\`\`\`\n\nFix the code and regenerate all files.`;
+            ? `You are a senior software engineer. A Discord bot failed to start. Your task is to fix ONLY the specific file(s) causing the error.\n\nSTEPS:\n1. Read the error message carefully and identify the exact file and line causing the issue.\n2. Analyze the root cause — do NOT guess.\n3. Edit ONLY the affected file(s) with minimal, precise changes.\n4. Do NOT rewrite entire files. Do NOT add new features. Do NOT change unrelated code.\n5. Preserve all existing functionality — only fix what is broken.\n6. Common issues: missing imports, wrong API usage, syntax errors, missing dependencies in requirements.txt/package.json.\n\nBOT ERROR:\n\`\`\`\n${error}\n\`\`\`\n\nEXISTING SOURCE FILES:\n\`\`\`\n${fileContext}\n\`\`\`\n\nOutput the fix as a single FILE: line with ONLY the changes needed. If you must rewrite a file, include the full file but keep changes minimal.`
+            : `You are a senior software engineer. A Discord bot failed to start. Your task is to fix the specific file causing the error.\n\nSTEPS:\n1. Read the error message carefully and identify the exact file and line.\n2. Analyze the root cause.\n3. Edit ONLY the affected file with minimal, precise changes.\n4. Do NOT rewrite entire files. Do NOT add new features.\n\nBOT ERROR:\n\`\`\`\n${error}\n\`\`\`\n\nOutput the fix as a single FILE: line with ONLY the changes needed.`;
         setInitialPrompt(prompt);
     };
 
