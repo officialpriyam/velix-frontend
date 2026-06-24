@@ -26,6 +26,7 @@ export function BotConsole({ sessionId, language, onClose, onFixWithAI }: BotCon
     const logRef = useRef<HTMLDivElement>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const pollRef = useRef<NodeJS.Timeout | null>(null);
+    const runningAnnouncedRef = useRef(false);
 
     useEffect(() => {
         if (logRef.current) {
@@ -50,6 +51,7 @@ export function BotConsole({ sessionId, language, onClose, onFixWithAI }: BotCon
                 let logData: any;
                 try { logData = JSON.parse(logText); } catch { return; }
                 if (logData.status === 'running' || logData.status === 'starting') {
+                    runningAnnouncedRef.current = logData.status === 'running';
                     setStatus(logData.status === 'running' ? 'running' : 'starting');
                     setShowTokenInput(false);
                     if (logData.logs && logData.logs.length > 0) {
@@ -104,6 +106,7 @@ export function BotConsole({ sessionId, language, onClose, onFixWithAI }: BotCon
     };
 
     const startBot = async () => {
+        runningAnnouncedRef.current = false;
         setStatus('starting');
         setShowTokenInput(false);
         addLog('Starting bot session...');
@@ -150,7 +153,8 @@ export function BotConsole({ sessionId, language, onClose, onFixWithAI }: BotCon
                         });
                     }
                     // Update status from server
-                    if (logData.status === 'running' && status !== 'running') {
+                    if (logData.status === 'running' && !runningAnnouncedRef.current) {
+                        runningAnnouncedRef.current = true;
                         setStatus('running');
                         addLog('Bot process started successfully');
                         addLog('Connecting to Discord gateway...');
