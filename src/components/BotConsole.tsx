@@ -12,8 +12,12 @@ interface BotConsoleProps {
 type BotStatus = 'idle' | 'starting' | 'running' | 'stopping' | 'error';
 
 export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
-    const [status, setStatus] = useState<BotStatus>('idle');
-    const [logs, setLogs] = useState<string[]>([]);
+    const [status, setStatus] = useState<BotStatus>(() => {
+        try { return (localStorage.getItem(`velix_bot_status_${sessionId}`) as BotStatus) || 'idle'; } catch { return 'idle'; }
+    });
+    const [logs, setLogs] = useState<string[]>(() => {
+        try { return JSON.parse(localStorage.getItem(`velix_bot_logs_${sessionId}`) || '[]'); } catch { return []; }
+    });
     const [showTokenInput, setShowTokenInput] = useState(true);
     const [timeLeft, setTimeLeft] = useState(0);
     const [maxMinutes, setMaxMinutes] = useState(10);
@@ -27,12 +31,57 @@ export function BotConsole({ sessionId, language, onClose }: BotConsoleProps) {
         }
     }, [logs]);
 
+    // Persist status and logs to localStorage
     useEffect(() => {
+        try { localStorage.setItem(`velix_bot_status_${sessionId}`, status); } catch {}
+    }, [status, sessionId]);
+    useEffect(() => {
+        try { localStorage.setItem(`velix_bot_logs_${sessionId}`, JSON.stringify(logs.slice(-500))); } catch {}
+    }, [logs, sessionId]);
+
+    // On mount: check if bot is already running (re-open after close)
+    useEffect(() => {
+        const checkExisting = async () => {
+            try {
+                const logRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/ai/bot/logs/${sessionId}`, { credentials: 'include' });
+                const logText = await logRes.text();
+                let logData: any;
+                try { logData = JSON.parse(logText); } catch { return; }
+                if (logData.status === 'running') {
+                    setStatus('running');
+                    setShowTokenInput(false);
+                    if (logData.logs && logData.logs.length > 0) {
+                        setLogs(logData.logs);
+                    }
+                    // Resume polling
+                    pollRef.current = setInterval(async () => {
+                        try {
+                            const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/ai/bot/logs/${sessionId}`, { credentials: 'include' });
+                            const t = await r.text();
+                            let d: any; try { d = JSON.parse(t); } catch { return; }
+                            if (d.logs && d.logs.length > 0) {
+                                setLogs(prev => {
+                                    const existing = new Set(prev);
+                                    const newLogs = d.logs.filter((l: string) => !existing.has(l));
+                                    return newLogs.length > 0 ? [...prev, ...newLogs] : prev;
+                                });
+                            }
+                            if (d.status === 'stopped' || d.status === 'error') {
+                                setStatus(d.status === 'error' ? 'error' : 'idle');
+                                if (timerRef.current) clearInterval(timerRef.current);
+                                if (pollRef.current) clearInterval(pollRef.current);
+                            }
+                        } catch {}
+                    }, 2000);
+                }
+            } catch {}
+        };
+        checkExisting();
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
             if (pollRef.current) clearInterval(pollRef.current);
         };
-    }, []);
+    }, [sessionId]);
 
     const formatTime = (seconds: number) => {
         const m = Math.floor(seconds / 60);
