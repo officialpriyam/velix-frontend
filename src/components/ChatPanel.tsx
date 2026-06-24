@@ -573,6 +573,7 @@ export const ChatPanel = ({
                 { role: 'assistant', content: result.rawResponse }
             ]);
         }
+        setLoading(false);
     };
 
     if (compact) {
