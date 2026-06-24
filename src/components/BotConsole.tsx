@@ -172,14 +172,16 @@ export function BotConsole({ sessionId, language, onClose, onFixWithAI }: BotCon
                         }, 1000);
                     }
                     if (logData.status === 'stopped' || logData.status === 'error') {
+                        if (pollRef.current) clearInterval(pollRef.current);
+                        if (timerRef.current) clearInterval(timerRef.current);
+                        pollRef.current = null;
+                        timerRef.current = null;
                         setStatus(logData.status === 'error' ? 'error' : 'idle');
                         addLog('Bot process ended');
                         if (logData.status === 'error') {
                             const errLogs = logData.logs?.filter((l: string) => l.includes('[ERR]')) || [];
                             setLastError(errLogs.length > 0 ? errLogs[errLogs.length - 1].replace(/^\[.*?\]\s*\[ERR\]\s*/, '') : 'Bot process failed');
                         }
-                        if (timerRef.current) clearInterval(timerRef.current);
-                        if (pollRef.current) clearInterval(pollRef.current);
                     }
                 } catch {}
             }, 2000);
@@ -192,10 +194,13 @@ export function BotConsole({ sessionId, language, onClose, onFixWithAI }: BotCon
     };
 
     const stopBot = async () => {
+        runningAnnouncedRef.current = false;
         setStatus('stopping');
         addLog('Stopping bot...');
         if (timerRef.current) clearInterval(timerRef.current);
         if (pollRef.current) clearInterval(pollRef.current);
+        timerRef.current = null;
+        pollRef.current = null;
 
         try {
             await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/ai/bot/stop/${sessionId}`, {
