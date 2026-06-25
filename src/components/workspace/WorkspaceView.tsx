@@ -109,8 +109,10 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
 
     // Restore platform/language from localStorage if URL params missing
     const savedPrefs = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('velix_session_prefs') || '{}') : {};
-    const [language, setLanguage] = useState(incomingLanguage !== 'java' ? incomingLanguage : (savedPrefs.language || incomingLanguage));
-    const [platform, setPlatform] = useState(incomingPlatform !== 'minecraft' ? incomingPlatform : (savedPrefs.platform || incomingPlatform));
+    const sessionKey = sessionId || 'new';
+    const sessionPrefs = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem(`velix_session_${sessionKey}`) || '{}') : {};
+    const [language, setLanguage] = useState(incomingLanguage || sessionPrefs.language || savedPrefs.language || 'java');
+    const [platform, setPlatform] = useState(incomingPlatform || sessionPrefs.platform || savedPrefs.platform || 'minecraft');
     const [initialPrompt, setInitialPrompt] = useState<string | null>(incomingPrompt);
     const [model, setModel] = useState<string>(incomingModel || 'anthropic/claude-3-sonnet');
     const [models, setModels] = useState<{ id: string; name: string }[]>([]);
@@ -230,8 +232,11 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage = '
     useEffect(() => {
         if (typeof window !== 'undefined') {
             localStorage.setItem('velix_session_prefs', JSON.stringify({ platform, language }));
+            if (sessionId) {
+                localStorage.setItem(`velix_session_${sessionId}`, JSON.stringify({ platform, language }));
+            }
         }
-    }, [platform, language]);
+    }, [platform, language, sessionId]);
 
     useEffect(() => {
         const jvs = compilerApi.getJavaVersions();
