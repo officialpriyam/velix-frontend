@@ -217,10 +217,10 @@ export function Footer() {
                 <Link href="/terms" className="hover:text-foreground/70 transition-colors">Terms</Link>
                 <Link href="/privacy" className="hover:text-foreground/70 transition-colors">Privacy</Link>
                 <Link href="/cookies" className="hover:text-foreground/70 transition-colors">Cookie Preferences</Link>
-                <Link href="/discord" className="hover:text-foreground/70 transition-colors">Discord</Link>
+                <a href="https://discord.gg/p6dGBwpEV" target="_blank" rel="noopener noreferrer" className="hover:text-foreground/70 transition-colors">Discord</a>
             </div>
-            <div>
-                © 2026 Velix AI - Not affiliated with Mojang, Microsoft, or Discord
+            <div className="flex items-center gap-1">
+                Developed by <a href="https://velix.snapgrids.store/" target="_blank" rel="noopener noreferrer" className="text-foreground/60 hover:text-foreground/80 transition-colors font-bold">PriyxStudio (Velix)</a>
             </div>
         </footer>
     );

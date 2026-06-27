@@ -52,7 +52,9 @@ export default function TermsPage() {
 
                     <section>
                         <h2 className="text-base font-semibold mb-2 text-foreground">7. Third-Party Integrations</h2>
-                        <p>The Service integrates with third-party APIs (including but not limited to NVIDIA, OpenRouter, and Supabase). We are not responsible for the availability, accuracy, or policies of these third-party services. Your use of third-party services is subject to their respective terms. We disclaim all liability arising from third-party service interruptions or failures.</p>
+                        <p>The Service integrates with third-party APIs (including but not limited to NVIDIA, OpenRouter, Supabase, and Discord). We are <strong>NOT</strong> affiliated with, endorsed by, or connected to OpenRouter, NVIDIA, Mojang Studios, Microsoft, Supabase, Discord Inc., or any other organization or company whose services may be used with this software.</p>
+                        <p className="mt-2">Your use of third-party services is subject to their respective terms. It is <strong>your responsibility</strong> to review and comply with the terms of service of any third-party API provider. Some providers (including NVIDIA) may <strong>not permit</strong> the use of free trial or free tier API keys for commercial applications. Using such services in violation of their terms is solely your responsibility.</p>
+                        <p className="mt-2">We disclaim all liability arising from third-party service interruptions, failures, or violations of third-party terms of service.</p>
                     </section>
 
                     <section>
