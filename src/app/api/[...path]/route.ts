@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import http from 'http';
+import https from 'https';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
     return proxy(req, (await params).path.join('/'), 'GET');
@@ -68,9 +69,10 @@ function httpRequest(path: string, method: string, body?: string, cookie?: strin
     const parsed = new URL(backendUrl);
 
     return new Promise((resolve, reject) => {
+        const isHttps = parsed.protocol === 'https:';
         const options: http.RequestOptions = {
             hostname: parsed.hostname,
-            port: parsed.port || 80,
+            port: parsed.port || (isHttps ? 443 : 80),
             path: `/api/${path}`,
             method,
             headers: {
@@ -81,7 +83,8 @@ function httpRequest(path: string, method: string, body?: string, cookie?: strin
             timeout: 180000
         };
 
-        const req = http.request(options, (res) => {
+        const client = isHttps ? https : http;
+        const req = client.request(options, (res) => {
             const chunks: Buffer[] = [];
             const respHeaders: Record<string, string> = {};
             const setCookies: string[] = [];
