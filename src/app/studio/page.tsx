@@ -72,18 +72,21 @@ export default function StudioPage() {
         setResult(null);
 
         try {
-            const apiBase = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '/api';
+            const apiBase = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/+$/, '');
+            const proxyBase = process.env.NEXT_PUBLIC_API_URL || '/api';
+            const useDirect = apiBase.startsWith('http');
+            const baseUrl = useDirect ? apiBase : proxyBase;
             let endpoint = '';
             let body: any = {};
 
             if (category === 'textures') {
-                endpoint = `${apiBase}/generate/texture`;
+                endpoint = `${baseUrl}/api/generator/texture`;
                 body = { prompt, resolution, type: texType };
             } else if (category === 'models') {
-                endpoint = `${apiBase}/generate/model`;
+                endpoint = `${baseUrl}/api/generator/model`;
                 body = { prompt, texture_ref: 'texture.png' };
             } else {
-                endpoint = `${apiBase}/generate/schematic`;
+                endpoint = `${baseUrl}/api/generator/schematic`;
                 body = { prompt, size: schematicSize };
             }
 
@@ -113,7 +116,10 @@ export default function StudioPage() {
 
     const handleDownload = () => {
         if (!result) return;
-        const baseUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/+$/, '');
+        const apiBase = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/+$/, '');
+        const proxyBase = process.env.NEXT_PUBLIC_API_URL || '/api';
+        const useDirect = apiBase.startsWith('http');
+        const baseUrl = useDirect ? apiBase : proxyBase;
         const url = result.download_url.startsWith('http') ? result.download_url : `${baseUrl}${result.download_url}`;
         const a = document.createElement('a');
         a.href = url;
@@ -321,7 +327,10 @@ export default function StudioPage() {
 
                         {/* Preview */}
                         {category === 'textures' && result.preview_url && (() => {
-                            const previewBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/+$/, '');
+                            const previewApiBase = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/+$/, '');
+                            const previewProxyBase = process.env.NEXT_PUBLIC_API_URL || '/api';
+                            const previewUseDirect = previewApiBase.startsWith('http');
+                            const previewBaseUrl = previewUseDirect ? previewApiBase : previewProxyBase;
                             const previewSrc = result.preview_url.startsWith('http') ? result.preview_url : `${previewBaseUrl}${result.preview_url}`;
                             return (
                                 <div className="flex justify-center p-6 rounded-xl bg-background border border-[hsl(var(--surface-sunk))]">
