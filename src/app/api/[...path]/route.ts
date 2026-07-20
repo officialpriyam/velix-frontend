@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import http from 'http';
 import https from 'https';
 
+const BINARY_PREFIXES = ['compiler/artifact', 'generator/download/', 'generator/preview/'];
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
     return proxy(req, (await params).path.join('/'), 'GET');
 }
@@ -34,17 +36,20 @@ async function proxy(req: NextRequest, path: string, method: string): Promise<Ne
 
         const cookie = req.headers.get('cookie') || '';
         const contentType = req.headers.get('content-type') || 'application/json';
+        const isBinary = BINARY_PREFIXES.some(p => path.startsWith(p));
 
-        const result = await httpRequest(path, method, body, cookie, contentType);
+        const result = await httpRequest(path, method, body, cookie, contentType, isBinary);
 
-        const headers = new Headers();
-
-        if (path.startsWith('compiler/artifact') || path.startsWith('generator/download/') || path.startsWith('generator/preview/')) {
+        if (isBinary) {
+            const headers = new Headers();
             headers.set('Content-Type', result.headers['content-type'] || 'application/octet-stream');
-            headers.set('Content-Disposition', result.headers['content-disposition'] || 'attachment');
-            return new NextResponse(result.rawBody || '', { status: result.status, headers });
+            if (result.headers['content-disposition']) {
+                headers.set('Content-Disposition', result.headers['content-disposition']);
+            }
+            return new NextResponse(result.rawBuffer || new Uint8Array(), { status: result.status, headers });
         }
 
+        const headers = new Headers();
         headers.set('Content-Type', 'application/json');
 
         const setCookies = result.setCookies;
@@ -63,8 +68,16 @@ async function proxy(req: NextRequest, path: string, method: string): Promise<Ne
     }
 }
 
-function httpRequest(path: string, method: string, body?: string, cookie?: string, contentType?: string): Promise<{ status: number; data: any; rawBody?: string; headers: Record<string, string>; setCookies: string[] }> {
-    // Backend URL: use env var on Vercel, fallback to localhost for local dev
+interface ProxyResult {
+    status: number;
+    data?: any;
+    rawBuffer?: Uint8Array;
+    rawBody?: string;
+    headers: Record<string, string>;
+    setCookies: string[];
+}
+
+function httpRequest(path: string, method: string, body?: string, cookie?: string, contentType?: string, binary: boolean = false): Promise<ProxyResult> {
     const backendUrl = process.env.BACKEND_URL || 'http://127.0.0.1:3006';
     const parsed = new URL(backendUrl);
 
@@ -101,7 +114,14 @@ function httpRequest(path: string, method: string, body?: string, cookie?: strin
 
             res.on('data', (chunk) => chunks.push(chunk));
             res.on('end', () => {
-                const rawBody = Buffer.concat(chunks).toString('utf-8');
+                const rawBuffer = Buffer.concat(chunks);
+
+                if (binary) {
+                    resolve({ status: res.statusCode || 500, rawBuffer: new Uint8Array(rawBuffer), headers: respHeaders, setCookies });
+                    return;
+                }
+
+                const rawBody = rawBuffer.toString('utf-8');
                 try {
                     resolve({ status: res.statusCode || 500, data: JSON.parse(rawBody), rawBody, headers: respHeaders, setCookies });
                 } catch {
