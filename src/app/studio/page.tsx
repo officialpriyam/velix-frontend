@@ -4,12 +4,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
     ArrowLeft, Loader2, Download, Wand2, Image, Box, Database,
-    Sparkles, Coins, ChevronRight, Zap, RotateCcw
+    Sparkles, Coins, ChevronRight, RotateCcw
 } from 'lucide-react';
 import { useNotification } from '@/components/Notification';
 
 type Category = 'textures' | 'models' | 'builds';
-type SchematicMode = 'fast' | 'craft';
 
 interface GenResult {
     file: string;
@@ -65,7 +64,6 @@ export default function StudioPage() {
     const [resolution, setResolution] = useState(32);
     const [texType, setTexType] = useState<'item' | 'block'>('item');
     const [schematicSize, setSchematicSize] = useState(48);
-    const [schematicMode, setSchematicMode] = useState<SchematicMode>('fast');
 
     const handleGenerate = async () => {
         if (!prompt.trim() || loading) return;
@@ -74,19 +72,19 @@ export default function StudioPage() {
         setResult(null);
 
         try {
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api';
+            const apiBase = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '/api';
             let endpoint = '';
             let body: any = {};
 
             if (category === 'textures') {
-                endpoint = `${apiBase}/generator/texture`;
+                endpoint = `${apiBase}/generate/texture`;
                 body = { prompt, resolution, type: texType };
             } else if (category === 'models') {
-                endpoint = `${apiBase}/generator/model`;
+                endpoint = `${apiBase}/generate/model`;
                 body = { prompt, texture_ref: 'texture.png' };
             } else {
-                endpoint = `${apiBase}/generator/schematic`;
-                body = { prompt, size: schematicSize, mode: schematicMode };
+                endpoint = `${apiBase}/generate/schematic`;
+                body = { prompt, size: schematicSize };
             }
 
             const res = await fetch(endpoint, {
@@ -115,8 +113,10 @@ export default function StudioPage() {
 
     const handleDownload = () => {
         if (!result) return;
+        const baseUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/+$/, '');
+        const url = result.download_url.startsWith('http') ? result.download_url : `${baseUrl}${result.download_url}`;
         const a = document.createElement('a');
-        a.href = result.download_url;
+        a.href = url;
         a.download = result.file;
         a.click();
     };
@@ -249,31 +249,6 @@ export default function StudioPage() {
                                     ))}
                                 </div>
                             </div>
-                            <div>
-                                <label className="text-[10px] font-bold text-muted uppercase tracking-wider">Mode</label>
-                                <div className="flex gap-1.5 mt-1.5">
-                                    <button
-                                        onClick={() => setSchematicMode('fast')}
-                                        className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${
-                                            schematicMode === 'fast'
-                                                ? 'bg-foreground text-background border-foreground'
-                                                : 'bg-background/50 text-muted border-[hsl(var(--surface-sunk))] hover:border-foreground/20'
-                                        }`}
-                                    >
-                                        <Zap className="w-3 h-3 inline mr-1" />Fast
-                                    </button>
-                                    <button
-                                        onClick={() => setSchematicMode('craft')}
-                                        className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${
-                                            schematicMode === 'craft'
-                                                ? 'bg-foreground text-background border-foreground'
-                                                : 'bg-background/50 text-muted border-[hsl(var(--surface-sunk))] hover:border-foreground/20'
-                                        }`}
-                                    >
-                                        <Sparkles className="w-3 h-3 inline mr-1" />Craft
-                                    </button>
-                                </div>
-                            </div>
                         </div>
                     )}
 
@@ -345,16 +320,20 @@ export default function StudioPage() {
                         </div>
 
                         {/* Preview */}
-                        {category === 'textures' && result.preview_url && (
-                            <div className="flex justify-center p-6 rounded-xl bg-background border border-[hsl(var(--surface-sunk))]">
-                                <img
-                                    src={result.preview_url}
-                                    alt="Generated texture"
-                                    className="max-h-64 rounded-lg"
-                                    style={{ imageRendering: 'pixelated' }}
-                                />
-                            </div>
-                        )}
+                        {category === 'textures' && result.preview_url && (() => {
+                            const previewBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/+$/, '');
+                            const previewSrc = result.preview_url.startsWith('http') ? result.preview_url : `${previewBaseUrl}${result.preview_url}`;
+                            return (
+                                <div className="flex justify-center p-6 rounded-xl bg-background border border-[hsl(var(--surface-sunk))]">
+                                    <img
+                                        src={previewSrc}
+                                        alt="Generated texture"
+                                        className="max-h-64 rounded-lg"
+                                        style={{ imageRendering: 'pixelated' }}
+                                    />
+                                </div>
+                            );
+                        })()}
 
                         {category !== 'textures' && (
                             <div className="p-6 rounded-xl bg-background border border-[hsl(var(--surface-sunk))] text-center">
