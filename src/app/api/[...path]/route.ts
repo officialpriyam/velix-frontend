@@ -39,7 +39,7 @@ async function proxy(req: NextRequest, path: string, method: string): Promise<Ne
 
         const headers = new Headers();
 
-        if (path.startsWith('compiler/artifact')) {
+        if (path.startsWith('compiler/artifact') || path.startsWith('generator/download/') || path.startsWith('generator/preview/')) {
             headers.set('Content-Type', result.headers['content-type'] || 'application/octet-stream');
             headers.set('Content-Disposition', result.headers['content-disposition'] || 'attachment');
             return new NextResponse(result.rawBody || '', { status: result.status, headers });
