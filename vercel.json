@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "http://185.172.175.223:3006/api/:path*"
+      "destination": "https://velix-api.iampriyam.me/api/:path*"
     }
   ]
 }
