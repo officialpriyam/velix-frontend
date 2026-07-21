@@ -694,6 +694,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                         onClearBuildResult={() => setBuildResult(null)}
                         onAutoFix={handleAutoFix}
                         onDownloadArtifact={(historyId) => compilerApi.downloadArtifact(historyId)}
+                        projectFiles={files}
                     />
                 </div>
             </div>

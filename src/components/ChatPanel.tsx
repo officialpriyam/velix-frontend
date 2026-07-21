@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square } from 'lucide-react';
+import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square, Globe, Brain, Eye } from 'lucide-react';
 import { aiApi, copyToClipboard } from '../lib/api';
 import { useNotification } from './Notification';
 import { useRouter } from 'next/navigation';
@@ -42,6 +42,7 @@ interface ChatPanelProps {
     onClearBuildResult?: () => void;
     onAutoFix?: (error: string) => void;
     onDownloadArtifact?: (historyId: number) => void;
+    projectFiles?: Record<string, string>;
 }
 
 function getFileIcon(filename: string) {
@@ -84,7 +85,8 @@ export const ChatPanel = ({
     compiling = false,
     onClearBuildResult,
     onAutoFix,
-    onDownloadArtifact
+    onDownloadArtifact,
+    projectFiles
 }: ChatPanelProps) => {
     const { showNotification } = useNotification();
     const router = useRouter();
@@ -94,6 +96,7 @@ export const ChatPanel = ({
     const [messages, setMessages] = useState<Message[]>([]);
     const [generatedFiles, setGeneratedFiles] = useState<{ created: string[]; edited: string[] }>({ created: [], edited: [] });
     const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: string; content: string; size: number }[]>([]);
+    const [enableWebSearch, setEnableWebSearch] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -470,6 +473,22 @@ export const ChatPanel = ({
             setStatusLog([...logs]);
         }
 
+        const hasImages = attachedFiles.some(f => f.type.startsWith('image/'));
+        const fileContextCount = projectFiles ? Object.keys(projectFiles).filter(p => !p.startsWith('.')).length : 0;
+
+        if (hasImages) {
+            logs.push({ message: `Vision: ${attachedFiles.filter(f => f.type.startsWith('image/')).length} image(s) attached`, type: 'done' });
+            setStatusLog([...logs]);
+        }
+        if (enableWebSearch) {
+            logs.push({ message: 'Web search enabled', type: 'done' });
+            setStatusLog([...logs]);
+        }
+        if (fileContextCount > 0) {
+            logs.push({ message: `Project context: ${fileContextCount} file(s)`, type: 'done' });
+            setStatusLog([...logs]);
+        }
+
         logs.push({ message: `Optimizing prompt...`, type: 'pending' });
         setStatusLog([...logs]);
 
@@ -494,7 +513,28 @@ export const ChatPanel = ({
 
         let result: any;
         try {
-            result = await aiApi.generate(optimizedPrompt, language, model, sessionId || undefined, platform, controller.signal);
+            // Extract images from attached files for vision
+            const imageAttachments = attachedFiles
+                .filter(f => f.type.startsWith('image/'))
+                .map(f => ({ data: f.content, mimeType: f.type }));
+
+            // Build file context from project files (paths + truncated content)
+            const fileContextEntries = projectFiles
+                ? Object.entries(projectFiles)
+                    .filter(([path]) => !path.startsWith('.') && !path.includes('node_modules'))
+                    .slice(0, 20)
+                    .map(([path, content]) => ({
+                        path,
+                        content: content.length > 2000 ? content.slice(0, 2000) + '\n[...truncated...]' : content
+                    }))
+                : [];
+
+            result = await aiApi.generate(
+                optimizedPrompt, language, model, sessionId || undefined, platform, controller.signal,
+                enableWebSearch,
+                imageAttachments.length > 0 ? imageAttachments : undefined,
+                fileContextEntries.length > 0 ? fileContextEntries : undefined
+            );
         } catch (fetchErr: any) {
             if (fetchErr.name === 'AbortError') {
                 setStatusLog([{ message: 'Generation stopped by user', type: 'error' }]);
@@ -643,6 +683,17 @@ export const ChatPanel = ({
                             title="Attach files"
                         >
                             <Paperclip className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setEnableWebSearch(!enableWebSearch)}
+                            className={`w-7 h-7 rounded-full border flex items-center justify-center transition-colors ${enableWebSearch
+                                ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
+                                : 'border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] text-foreground/50 hover:text-foreground'
+                                }`}
+                            title={enableWebSearch ? 'Web search ON' : 'Web search OFF'}
+                        >
+                            <Globe className="w-3.5 h-3.5" />
                         </button>
                         {modelDropdown}
                         {typeDropdown}
@@ -895,6 +946,22 @@ export const ChatPanel = ({
                         >
                             <Paperclip className="w-3.5 h-3.5" />
                         </button>
+                        <button
+                            onClick={() => setEnableWebSearch(!enableWebSearch)}
+                            className={`p-1.5 rounded-lg transition-all ${enableWebSearch
+                                ? 'text-blue-400 bg-blue-500/10'
+                                : 'text-muted hover:text-primary active:scale-95'
+                                }`}
+                            title={enableWebSearch ? 'Web search ON' : 'Web search OFF'}
+                        >
+                            <Globe className="w-3.5 h-3.5" />
+                        </button>
+                        {attachedFiles.some(f => f.type.startsWith('image/')) && (
+                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px]">
+                                <Eye className="w-2.5 h-2.5" />
+                                <span>{attachedFiles.filter(f => f.type.startsWith('image/')).length}</span>
+                            </div>
+                        )}
                         <button
                             onClick={handleEnhance}
                             disabled={loading || !prompt.trim()}
