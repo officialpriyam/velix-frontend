@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
-import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square, Globe, Brain, Eye } from 'lucide-react';
+import { ModelSelector } from './ModelSelector';
+import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square, Globe, Brain, Eye, ChevronDown } from 'lucide-react';
 import { aiApi, copyToClipboard } from '../lib/api';
 import { useNotification } from './Notification';
 import { useRouter } from 'next/navigation';
@@ -15,6 +16,9 @@ interface Message {
     created_at?: string;
     files?: any[];
     attachments?: { name: string; type: string; size: number }[];
+    workingStatus?: string;
+    planData?: any;
+    questions?: any[];
 }
 
 export interface BuildResult {
@@ -425,7 +429,7 @@ export const ChatPanel = ({
         });
 
         if (execMode === 'plan') {
-            setStatusLog([{ message: 'Analyzing marketplace site patterns & planning blueprint...', type: 'pending' }]);
+            setStatusLog([{ message: 'Analyzing request parameters & goals...', type: 'pending' }]);
             try {
                 const planRes = await aiApi.getPlan(finalPrompt, platform, language, model, controller.signal);
                 if (planRes) {
@@ -433,8 +437,18 @@ export const ChatPanel = ({
                     setActiveQuestionIndex(0);
                     setPlanApproved(false);
                     setPlanPrompt(finalPrompt);
-                    setShowPlanDrawer(true);
-                    setStatusLog([{ message: 'Plan & questions generated', type: 'done' }]);
+                    setStatusLog([{ message: 'Plan & clarifying questions generated', type: 'done' }]);
+
+                    setMessages(prev => [
+                        ...prev,
+                        {
+                            role: 'assistant',
+                            content: `Reviewing request parameters and goals. Here is the blueprint plan and options for how we should build this:`,
+                            workingStatus: 'Reviewing request parameters and goals',
+                            planData: planRes.plan,
+                            questions: planRes.questions
+                        }
+                    ]);
                 }
             } catch (planErr: any) {
                 console.error('Plan failed:', planErr);
@@ -615,6 +629,12 @@ export const ChatPanel = ({
             showNotification(result.error, 'error');
             setLoading(false);
             return;
+        }
+
+        if (result.imageWarning) {
+            showNotification(result.imageWarning, 'info');
+            logs.push({ message: result.imageWarning, type: 'done' });
+            setStatusLog([...logs]);
         }
 
         if (result.creditsUsed !== undefined && result.creditsRemaining !== undefined) {
@@ -874,7 +894,20 @@ export const ChatPanel = ({
     const showFileChips = isLast && msg.role === 'assistant' && generatedFiles.created.length + generatedFiles.edited.length > 0;
     return (
         <React.Fragment key={i}>
-            <ChatMessage role={msg.role} content={msg.content} attachments={msg.attachments} />
+            <ChatMessage
+                role={msg.role}
+                content={msg.content}
+                created_at={msg.created_at}
+                attachments={msg.attachments}
+                workingStatus={msg.workingStatus}
+                planData={msg.planData}
+                questions={msg.questions}
+                onPlanSubmit={(answers) => {
+                    setSelectedAnswers(answers);
+                    setPlanApproved(true);
+                    runBuildGeneration(prompt || msg.content);
+                }}
+            />
             {showFileChips && (
                 <FileChipsSummary created={generatedFiles.created} edited={generatedFiles.edited} />
             )}
@@ -1044,6 +1077,64 @@ export const ChatPanel = ({
                         className="neu-input w-full text-xs text-foreground rounded-2xl p-4 pr-20 outline-none transition-all resize-none h-20"
                     />
                     <div className="absolute right-3 bottom-3 flex items-center gap-1.5 z-20">
+                        {/* Model Selector Dropdown */}
+                        {modelDropdown ? modelDropdown : (
+                            <ModelSelector selectedModel={model} onSelectModel={() => {}} />
+                        )}
+
+                        {/* Mode Selector Dropdown (Build / Plan / Chat) */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setShowExecModeDropdown(!showExecModeDropdown)}
+                                className="rounded-full border border-white/10 bg-[hsl(var(--surface-sunk))] px-2.5 py-1 text-[11px] text-foreground/80 flex items-center gap-1 hover:bg-white/10 hover:text-foreground transition-all font-semibold"
+                                title="Execution mode"
+                            >
+                                <span className="capitalize">{execMode === 'build' ? 'Build' : execMode === 'plan' ? 'Plan' : 'Chat'}</span>
+                                <ChevronDown className="w-3 h-3 text-muted" />
+                            </button>
+                            {showExecModeDropdown && (
+                                <div className="absolute bottom-full right-0 mb-2 w-36 rounded-xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] p-1.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setExecMode('build');
+                                            setChatMode(false);
+                                            setShowExecModeDropdown(false);
+                                        }}
+                                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between ${execMode === 'build' ? 'bg-primary/10 text-primary font-bold' : 'text-foreground/80 hover:bg-[hsl(var(--surface-sunk))]'}`}
+                                    >
+                                        <span>Build Mode</span>
+                                        {execMode === 'build' && <Check className="w-3.5 h-3.5 text-primary" />}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setExecMode('plan');
+                                            setChatMode(false);
+                                            setShowExecModeDropdown(false);
+                                        }}
+                                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between ${execMode === 'plan' ? 'bg-purple-500/10 text-purple-400 font-bold' : 'text-foreground/80 hover:bg-[hsl(var(--surface-sunk))]'}`}
+                                    >
+                                        <span>Plan Mode</span>
+                                        {execMode === 'plan' && <Check className="w-3.5 h-3.5 text-purple-400" />}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setExecMode('chat');
+                                            setChatMode(true);
+                                            setShowExecModeDropdown(false);
+                                        }}
+                                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between ${execMode === 'chat' ? 'bg-emerald-500/10 text-emerald-400 font-bold' : 'text-foreground/80 hover:bg-[hsl(var(--surface-sunk))]'}`}
+                                    >
+                                        <span>Chat Mode</span>
+                                        {execMode === 'chat' && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={loading || attachedFiles.length >= MAX_FILES}
@@ -1058,7 +1149,7 @@ export const ChatPanel = ({
                         <button
                             onClick={() => setEnableWebSearch(!enableWebSearch)}
                             className={`p-1.5 rounded-lg transition-all ${enableWebSearch
-                                ? 'text-blue-400 bg-blue-500/10'
+                                ? 'text-blue-400 bg-blue-500/10 border border-blue-500/30'
                                 : 'text-muted hover:text-primary active:scale-95'
                                 }`}
                             title={enableWebSearch ? 'Web search ON' : 'Web search OFF'}

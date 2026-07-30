@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, ChevronDown, Search, Check, Zap, Cpu, Award } from 'lucide-react';
+import { Sparkles, ChevronDown, Search, Check, Zap, Award } from 'lucide-react';
 import { aiApi } from '@/lib/api';
 
 export interface ModelItem {
@@ -56,10 +56,8 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
     const [search, setSearch] = useState('');
     const [tiersData, setTiersData] = useState<ModelTiersData | null>(null);
     const [flatModels, setFlatModels] = useState<ModelItem[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [expandedTier, setExpandedTier] = useState<string | null>(null); // track which tier is expanded
+    const [expandedTier, setExpandedTier] = useState<string | null>(null);
 
-    // Helper to pick a limited random subset of models for a tier
     const getRandomModels = (models: ModelItem[], count: number = 3): ModelItem[] => {
         if (!models || models.length === 0) return [];
         const shuffled = [...models].sort(() => Math.random() - 0.5);
@@ -67,18 +65,15 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
     };
 
     useEffect(() => {
-        setLoading(true);
         aiApi.getModels().then(data => {
             if (data) {
                 if (data.tiers) setTiersData(data.tiers);
                 if (data.flat && Array.isArray(data.flat)) setFlatModels(data.flat);
                 else if (Array.isArray(data)) setFlatModels(data);
             }
-        }).catch(err => console.error('Failed to load models:', err))
-        .finally(() => setLoading(false));
+        }).catch(err => console.error('Failed to load models:', err));
     }, []);
 
-    // Close on outside click
     useEffect(() => {
         if (!isOpen) return;
         const handler = () => setIsOpen(false);
@@ -95,12 +90,6 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
         return id.split('/').pop()?.replace(/:free/g, '').replace(/-/g, ' ') || id;
     };
 
-    const filteredModels = flatModels.filter(m => {
-        if (!search.trim()) return true;
-        const q = search.toLowerCase();
-        return m.id.toLowerCase().includes(q) || (m.name && m.name.toLowerCase().includes(q));
-    });
-
     return (
         <div className="relative w-fit" onClick={e => e.stopPropagation()}>
             <button
@@ -115,7 +104,6 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
 
             {isOpen && (
                 <div className="absolute top-full left-0 mt-2 w-[280px] sm:w-[320px] rounded-2xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] p-2.5 z-50 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
-                    {/* Search bar */}
                     <div className="relative mb-2">
                         <Search className="w-3.5 h-3.5 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
                         <input
@@ -129,134 +117,77 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
                     </div>
 
                     <div className="max-h-[320px] overflow-y-auto space-y-1.5 pr-0.5 custom-scrollbar">
-                        {!search.trim() ? (
-                            <>
-                                    {/* Tier Presets Header */}
-                                    <div className="px-2 py-1 text-[10px] font-bold text-muted uppercase tracking-wider">
-                                        Velix Model Tiers
-                                    </div>
-                                    {PRESET_TIERS.map(tier => {
-                                        const IconComp = tier.icon;
-                                        const isTierExpanded = expandedTier === tier.id;
-                                        const tierModels = tiersData && (tier.id === 'velix-lite' ? tiersData.lite?.models : tier.id === 'velix-pro' ? tiersData.pro?.models : tier.id === 'velix-max' ? tiersData.max?.models : []);
-                                        const displayModels = getRandomModels(tierModels || [], 3);
-                                        const isSelected = selectedModel === tier.id || displayModels.some(m => m.id === selectedModel);
-                                        return (
-                                            <div key={tier.id}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        if (isTierExpanded) {
-                                                            // collapse
-                                                            setExpandedTier(null);
-                                                        } else {
-                                                            setExpandedTier(tier.id);
-                                                        }
-                                                    }}
-                                                    className={`w-full text-left p-2.5 rounded-xl text-xs transition-all flex items-start justify-between gap-2 border ${
-                                                        isSelected ? 'bg-primary/10 border-primary/30 text-foreground font-semibold shadow-sm' : 'border-transparent text-foreground/70 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-start gap-2.5">
-                                                        <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${
-                                                            tier.color === 'emerald' ? 'bg-emerald-500/15 text-emerald-400' :
-                                                            tier.color === 'indigo' ? 'bg-indigo-500/15 text-indigo-400' :
-                                                            'bg-amber-500/15 text-amber-400'
-                                                        }`}>
-                                                            <IconComp className="w-3.5 h-3.5" />
-                                                        </div>
-                                                        <div>
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="font-bold text-foreground">{tier.name}</span>
-                                                                <span className="px-1.5 py-0.2 text-[9px] font-medium bg-[hsl(var(--surface-sunk))] text-muted rounded-full">{tier.badge}</span>
-                                                            </div>
-                                                            <div className="text-[10px] text-muted mt-0.5 leading-tight">{tier.desc}</div>
-                                                        </div>
-                                                        {isTierExpanded && <ChevronDown className="w-3 h-3 text-muted ml-auto" />}
-                                                    </div>
-                                                    {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0 mt-1" />}
-                                                </button>
-                                                {/* Expanded model list for this tier */}
-                                                {isTierExpanded && displayModels.length > 0 && (
-                                                    <div className="ml-4 mt-2 space-y-1">
-                                                        {displayModels.map(m => (
-                                                            <button
-                                                                key={m.id}
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    onSelectModel(m.id);
-                                                                    setIsOpen(false);
-                                                                    setExpandedTier(null);
-                                                                }}
-                                                                className={`w-full text-left px-2 py-1 rounded-md text-xs flex items-center justify-between ${selectedModel === m.id ? 'bg-primary/10 text-foreground font-semibold' : 'text-foreground/70 hover:bg-[hsl(var(--surface-sunk))]'} `}
-                                                            >
-                                                                <span className="truncate">{m.name || m.id}</span>
-                                                                {m.id.endsWith(':free') && <span className="ml-2 px-1.5 py-0.2 text-[8px] font-bold bg-emerald-500/15 text-emerald-400 rounded">Free</span>}
-                                                                {m.provider === 'nvidia' && <span className="ml-2 px-1.5 py-0.2 text-[8px] font-bold bg-green-500/15 text-green-400 rounded">NVIDIA</span>}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+                        <div className="px-2 py-1 text-[10px] font-bold text-muted uppercase tracking-wider">
+                            Velix Model Tiers
+                        </div>
+                        {PRESET_TIERS.map(tier => {
+                            const IconComp = tier.icon;
+                            const isTierExpanded = expandedTier === tier.id;
+                            const tierModels = tiersData && (
+                                tier.id === 'velix-lite' ? tiersData.lite?.models :
+                                tier.id === 'velix-pro' ? tiersData.pro?.models :
+                                tier.id === 'velix-max' ? tiersData.max?.models : []
+                            );
+                            const displayModels = getRandomModels(tierModels || [], 3);
+                            const isSelected = selectedModel === tier.id || displayModels.some(m => m.id === selectedModel);
 
-                                {/* Individual Models List Header */}
-                                {flatModels.length > 0 && (
-                                    <div className="pt-2 px-2 py-1 text-[10px] font-bold text-muted uppercase tracking-wider flex items-center justify-between">
-                                        <span>All Available Models</span>
-                                        <span className="text-[9px] font-normal text-muted/60">{flatModels.length} models</span>
-                                    </div>
-                                )}
-                            </>
-                        ) : null}
-
-                        {/* Filtered or Flat Model List */}
-                        {filteredModels.length > 0 ? (
-                            filteredModels.map(m => {
-                                const isSelected = selectedModel === m.id;
-                                const isFree = m.id.endsWith(':free');
-                                const isNvidia = m.provider === 'nvidia' || m.id.startsWith('nvidia/');
-
-                                return (
+                            return (
+                                <div key={tier.id}>
                                     <button
-                                        key={m.id}
                                         type="button"
                                         onClick={() => {
-                                            onSelectModel(m.id);
-                                            setIsOpen(false);
+                                            onSelectModel(tier.id);
+                                            setExpandedTier(isTierExpanded ? null : tier.id);
                                         }}
-                                        className={`w-full text-left px-2.5 py-2 rounded-xl text-xs transition-all flex items-center justify-between gap-2 ${
-                                            isSelected
-                                                ? 'bg-primary/10 text-foreground font-bold border border-primary/20'
-                                                : 'text-foreground/70 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground'
+                                        className={`w-full text-left p-2.5 rounded-xl text-xs transition-all flex items-start justify-between gap-2 border ${
+                                            isSelected ? 'bg-primary/10 border-primary/30 text-foreground font-semibold shadow-sm' : 'border-transparent text-foreground/70 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground'
                                         }`}
                                     >
-                                        <div className="flex items-center gap-2 truncate">
-                                            <Cpu className="w-3.5 h-3.5 text-muted shrink-0" />
-                                            <span className="truncate">{m.name || m.id}</span>
+                                        <div className="flex items-start gap-2.5">
+                                            <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${
+                                                tier.color === 'emerald' ? 'bg-emerald-500/15 text-emerald-400' :
+                                                tier.color === 'indigo' ? 'bg-indigo-500/15 text-indigo-400' :
+                                                'bg-amber-500/15 text-amber-400'
+                                            }`}>
+                                                <IconComp className="w-3.5 h-3.5" />
+                                            </div>
+
+                                            <div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="font-bold text-foreground">{tier.name}</span>
+                                                    <span className="px-1.5 py-0.2 text-[9px] font-medium bg-[hsl(var(--surface-sunk))] text-muted rounded-full">{tier.badge}</span>
+                                                </div>
+                                                <div className="text-[10px] text-muted mt-0.5 leading-tight">{tier.desc}</div>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-1 shrink-0">
-                                            {isFree && (
-                                                <span className="px-1.5 py-0.5 text-[8px] font-bold bg-emerald-500/15 text-emerald-400 rounded">
-                                                    Free
-                                                </span>
-                                            )}
-                                            {isNvidia && (
-                                                <span className="px-1.5 py-0.5 text-[8px] font-bold bg-green-500/15 text-green-400 rounded">
-                                                    NVIDIA
-                                                </span>
-                                            )}
-                                            {isSelected && <Check className="w-3 h-3 text-primary ml-1" />}
+                                        <div className="flex items-center gap-1">
+                                            {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
                                         </div>
                                     </button>
-                                );
-                            })
-                        ) : search.trim() ? (
-                            <div className="py-6 text-center text-xs text-muted">
-                                No models matching "{search}"
-                            </div>
-                        ) : null}
+
+                                    {isTierExpanded && displayModels.length > 0 && (
+                                        <div className="ml-4 mt-2 space-y-1">
+                                            {displayModels.map(m => (
+                                                <button
+                                                    key={m.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        onSelectModel(m.id);
+                                                        setIsOpen(false);
+                                                        setExpandedTier(null);
+                                                    }}
+                                                    className={`w-full text-left px-2 py-1 rounded-md text-xs flex items-center justify-between ${selectedModel === m.id ? 'bg-primary/10 text-foreground font-semibold' : 'text-foreground/70 hover:bg-[hsl(var(--surface-sunk))]'}`}
+                                                >
+                                                    <span className="truncate">{m.name || m.id}</span>
+                                                    {m.id.endsWith(':free') && <span className="ml-2 px-1.5 py-0.2 text-[8px] font-bold bg-emerald-500/15 text-emerald-400 rounded">Free</span>}
+                                                    {m.provider === 'nvidia' && <span className="ml-2 px-1.5 py-0.2 text-[8px] font-bold bg-green-500/15 text-green-400 rounded">NVIDIA</span>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}

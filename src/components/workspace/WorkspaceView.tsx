@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { fileApi, compilerApi, aiApi, versionsApi, dependenciesApi, copyToClipboard } from '@/lib/api';
 import { ChatPanel, BuildResult } from '@/components/ChatPanel';
+import { ModelSelector } from '@/components/ModelSelector';
 import { FileTree } from '@/components/FileTree';
 import { Editor } from '@/components/Editor';
 import { useNotification } from '@/components/Notification';
@@ -705,6 +706,12 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                         language={language}
                         platform={platform}
                         model={model}
+                        modelDropdown={
+                            <ModelSelector
+                                selectedModel={model}
+                                onSelectModel={setModel}
+                            />
+                        }
                         initialPrompt={initialPrompt}
                         onInitialPromptHandled={() => setInitialPrompt(null)}
                         highlight={highlight}
