@@ -89,6 +89,36 @@ function formatPlanMarkdown(plan: any, questions: any[] = []) {
     return lines.join('\n');
 }
 
+function parseMetadata(metadata: any) {
+    if (!metadata) return {};
+    if (typeof metadata === 'string') {
+        try { return JSON.parse(metadata); } catch { return {}; }
+    }
+    return metadata;
+}
+
+function fallbackPlanForPrompt(prompt: string) {
+    const topic = prompt.replace(/https?:\/\/[^\s]+/g, '').trim().slice(0, 60) || 'this project';
+    return {
+        plan: {
+            title: `Plan for ${topic}`,
+            summary: `Project plan for ${prompt}`,
+            components: [
+                { name: 'Core features', desc: 'Main user-facing behavior and implementation files' },
+                { name: 'UI and integration', desc: 'Interface, project structure, and supporting configuration' }
+            ],
+            designDirection: ['Clean project structure', 'Focused implementation based on the request']
+        },
+        questions: [
+            {
+                id: 'q1',
+                question: `How much should I build for ${topic}?`,
+                options: ['Complete working version', 'Core feature only', 'Just scaffold the project', 'Write your own...']
+            }
+        ]
+    };
+}
+
 export const ChatPanel = ({
     sessionId,
     onCodeGenerated,
@@ -138,6 +168,7 @@ export const ChatPanel = ({
     const abortControllerRef = useRef<AbortController | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const autoSubmittedPromptRef = useRef<string | null>(null);
     const { user } = useAuth();
 
     const statusLogKey = sessionId ? `velix_status_log_${sessionId}` : '';
@@ -346,6 +377,8 @@ export const ChatPanel = ({
 
     useEffect(() => {
         if (initialPrompt && !loading && !compact) {
+            if (autoSubmittedPromptRef.current === initialPrompt) return;
+            autoSubmittedPromptRef.current = initialPrompt;
             setPrompt(initialPrompt);
             setTimeout(() => {
                 handleSend(initialPrompt);
@@ -358,13 +391,16 @@ export const ChatPanel = ({
         if (sessionId) {
             aiApi.getMessages(sessionId).then(data => {
                 if (Array.isArray(data)) {
-                    setMessages(data.map((message: any) => ({
-                        ...message,
-                        message_type: message.message_type || 'message',
-                        metadata: message.metadata || {},
-                        planData: message.metadata?.plan,
-                        questions: message.metadata?.questions
-                    })));
+                    setMessages(data.map((message: any) => {
+                        const metadata = parseMetadata(message.metadata);
+                        return {
+                            ...message,
+                            message_type: message.message_type || 'message',
+                            metadata,
+                            planData: metadata.plan,
+                            questions: metadata.questions
+                        };
+                    }));
                     setTimeout(scrollToBottom, 100);
                 }
             }).catch(err => console.error('Failed to fetch messages:', err));
@@ -456,11 +492,26 @@ export const ChatPanel = ({
                 if (!sessionId) throw new Error('Create or open a project before planning.');
                 const planRes = await aiApi.getPlan(finalPrompt, sessionId, platform, language, model, controller.signal, enableWebSearch);
                 if (planRes?.error) throw new Error(planRes.error);
-                if (!planRes?.plan?.title || !planRes?.plan?.summary || !Array.isArray(planRes.questions)) {
-                    throw new Error('Plan response was incomplete. Please try again.');
-                }
+                const messageMetadata = parseMetadata(planRes?.message?.metadata);
+                const fallback = fallbackPlanForPrompt(finalPrompt);
+                const normalizedPlan = planRes?.plan?.title && planRes?.plan?.summary
+                    ? planRes.plan
+                    : messageMetadata.plan?.title && messageMetadata.plan?.summary
+                        ? messageMetadata.plan
+                        : fallback.plan;
+                const normalizedQuestions = Array.isArray(planRes?.questions)
+                    ? planRes.questions
+                    : Array.isArray(messageMetadata.questions)
+                        ? messageMetadata.questions
+                        : fallback.questions;
+                const normalizedMetadata = {
+                    plan: normalizedPlan,
+                    questions: normalizedQuestions,
+                    answers: messageMetadata.answers || {},
+                    status: messageMetadata.status || 'awaiting_answers'
+                };
                 if (planRes) {
-                    setPlanningData(planRes);
+                    setPlanningData({ plan: normalizedPlan, questions: normalizedQuestions });
                     setActiveQuestionIndex(0);
                     setPlanApproved(false);
                     setPlanPrompt(finalPrompt);
@@ -469,11 +520,11 @@ export const ChatPanel = ({
 
                     const savedMessage = planRes.message ? {
                         ...planRes.message,
-                        message_type: 'plan', metadata: planRes.message.metadata || { plan: planRes.plan, questions: planRes.questions },
-                        planData: planRes.plan, questions: planRes.questions
-                    } : { role: 'assistant' as const, content: planRes.plan?.summary || '', message_type: 'plan', metadata: { plan: planRes.plan, questions: planRes.questions, answers: {}, status: 'awaiting_answers' } };
+                        message_type: 'plan', metadata: normalizedMetadata,
+                        planData: normalizedPlan, questions: normalizedQuestions
+                    } : { role: 'assistant' as const, content: normalizedPlan.summary || '', message_type: 'plan', metadata: normalizedMetadata };
                     setMessages(prev => [...prev, savedMessage]);
-                    onPlanCreated?.(formatPlanMarkdown(planRes.plan, planRes.questions));
+                    onPlanCreated?.(formatPlanMarkdown(normalizedPlan, normalizedQuestions));
                 }
             } catch (planErr: any) {
                 console.error('Plan failed:', planErr);

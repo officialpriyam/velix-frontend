@@ -17,7 +17,7 @@ export default function IdePage() {
     const { id } = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const initialPrompt = searchParams.get('prompt');
+    const [initialPrompt] = useState(() => searchParams.get('prompt'));
     const initialModel = searchParams.get('model');
     const initialLanguage = searchParams.get('language');
     const initialPlatform = searchParams.get('platform');
@@ -35,6 +35,14 @@ export default function IdePage() {
             })
             .catch(() => { router.push('/'); });
     }, []);
+
+    useEffect(() => {
+        if (!id || !searchParams.get('prompt')) return;
+        const nextParams = new URLSearchParams(searchParams.toString());
+        nextParams.delete('prompt');
+        const query = nextParams.toString();
+        router.replace(`/ide/${id}${query ? `?${query}` : ''}`, { scroll: false });
+    }, [id, router, searchParams]);
 
     // Check project access
     useEffect(() => {
