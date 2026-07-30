@@ -26,12 +26,12 @@ async function safeJson(res: Response) {
 }
 
 export const aiApi = {
-    generate: async (prompt: string, language: string, model?: string, sessionId?: string, platform?: string, signal?: AbortSignal, enableWebSearch?: boolean, images?: Array<{ data: string; mimeType: string }>, fileContext?: Array<{ path: string; content: string }>, chatMode?: boolean) => {
+    generate: async (prompt: string, language: string, model?: string, sessionId?: string, platform?: string, signal?: AbortSignal, enableWebSearch?: boolean, images?: Array<{ data: string; mimeType: string }>, fileContext?: Array<{ path: string; content: string }>, chatMode?: boolean, fromPlan?: boolean, planMessageId?: number) => {
         const res = await fetch(`${BASE_URL}/ai/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ prompt, language, model, sessionId, platform, enableWebSearch, images, fileContext, chatMode }),
+            body: JSON.stringify({ prompt, language, model, sessionId, platform, enableWebSearch, images, fileContext, chatMode, fromPlan, planMessageId }),
             signal
         });
         return safeJson(res);
@@ -43,6 +43,10 @@ export const aiApi = {
     },
     getMessages: async (sessionId: string) => {
         const res = await fetch(`${BASE_URL}/ai/messages/${sessionId}`, { credentials: 'include' });
+        return safeJson(res);
+    },
+    clearMessages: async (sessionId: string) => {
+        const res = await fetch(`${BASE_URL}/ai/messages/${sessionId}`, { method: 'DELETE', credentials: 'include' });
         return safeJson(res);
     },
     deleteProject: async (sessionId: string) => {
@@ -118,13 +122,20 @@ export const aiApi = {
         });
         return safeJson(res);
     },
-    getPlan: async (prompt: string, platform?: string, language?: string, model?: string, signal?: AbortSignal) => {
+    getPlan: async (prompt: string, sessionId: string, platform?: string, language?: string, model?: string, signal?: AbortSignal) => {
         const res = await fetch(`${BASE_URL}/ai/plan`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ prompt, platform, language, model }),
+            body: JSON.stringify({ prompt, sessionId, platform, language, model }),
             signal
+        });
+        return safeJson(res);
+    },
+    updatePlan: async (messageId: number, sessionId: string, answers: Record<string, string>, status: 'awaiting_approval' | 'approved') => {
+        const res = await fetch(`${BASE_URL}/ai/plans/${messageId}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+            body: JSON.stringify({ sessionId, answers, status })
         });
         return safeJson(res);
     },

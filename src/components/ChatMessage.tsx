@@ -1,274 +1,66 @@
 import React, { useState } from 'react';
-import { User, Bot, Image, FileCode, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Bot, Check, ChevronLeft, ChevronRight, FileCode, FileText, Image, Loader2 } from 'lucide-react';
 
-interface Attachment {
-  name: string;
-  type: string;
-  size: number;
+export interface QuestionItem { id: string; question: string; options: string[]; }
+export interface PlanData { title: string; summary: string; components?: { name: string; desc: string }[]; designDirection?: string[]; }
+export interface ChatMetadata {
+  plan?: PlanData; questions?: QuestionItem[]; answers?: Record<string, string>; status?: string;
+  files?: { path: string; size?: number }[]; event?: string;
 }
 
-export interface QuestionItem {
-  id: string;
-  question: string;
-  options: string[];
+interface Props {
+  id?: number; role: 'user' | 'assistant'; content: string; created_at?: string; messageType?: string;
+  metadata?: ChatMetadata; attachments?: { name: string; type: string; size: number }[];
+  onSavePlan?: (id: number, answers: Record<string, string>) => void; onApprovePlan?: (id: number) => void;
+  onOpenPlan?: (id: number) => void;
 }
 
-export interface PlanData {
-  title: string;
-  summary: string;
-  components?: { name: string; desc: string }[];
-  designDirection?: string[];
-}
-
-interface ChatMessageProps {
-  role: 'user' | 'assistant';
-  content: string;
-  created_at?: string;
-  attachments?: Attachment[];
-  workingStatus?: string;
-  planData?: PlanData;
-  questions?: QuestionItem[];
-  onSelectOption?: (questionId: string, option: string) => void;
-  onPlanSubmit?: (answers: Record<string, string>) => void;
-  onOpenPlan?: () => void;
-}
-
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-};
-
-export const ChatMessage: React.FC<ChatMessageProps> = ({
-  role,
-  content,
-  created_at,
-  attachments,
-  workingStatus,
-  planData,
-  questions,
-  onSelectOption,
-  onPlanSubmit,
-  onOpenPlan
-}) => {
+export function ChatMessage({ id, role, content, created_at, messageType = 'message', metadata = {}, attachments, onSavePlan, onApprovePlan, onOpenPlan }: Props) {
   const isUser = role === 'user';
-  const [currentQIndex, setCurrentQIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [customText, setCustomText] = useState<Record<string, string>>({});
+  const questions = metadata.questions || [];
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string>>(metadata.answers || {});
+  const [custom, setCustom] = useState<Record<string, string>>({});
+  const question = questions[index];
+  const status = metadata.status || 'awaiting_answers';
+  const save = (next = answers) => id && onSavePlan?.(id, next);
 
-  const handleOptionClick = (qId: string, option: string) => {
-    const newAnswers = { ...answers, [qId]: option };
-    setAnswers(newAnswers);
-    if (onSelectOption) onSelectOption(qId, option);
+  if (messageType === 'timeline') return null;
+  if (isUser) return <div className="flex flex-col items-end my-3 animate-in fade-in duration-200">
+    {created_at && <span className="mb-1 text-[10px] text-zinc-500">{new Date(created_at).toLocaleString()}</span>}
+    <div className="max-w-[85%] rounded-3xl border border-white/10 bg-[#29292e] px-4 py-2.5 text-xs font-medium leading-relaxed text-zinc-100"><p className="whitespace-pre-wrap">{content}</p>
+      {attachments?.length ? <div className="mt-2 flex flex-wrap gap-1">{attachments.map((a, i) => <span key={i} className="rounded-full bg-white/10 px-2 py-1 text-[10px]">{a.name}</span>)}</div> : null}
+    </div>
+  </div>;
+
+  const select = (value: string) => {
+    if (!question) return;
+    const next = { ...answers, [question.id]: value };
+    setAnswers(next);
   };
 
-  const currentQ = questions && questions.length > 0 ? questions[currentQIndex] : null;
-
-  if (isUser) {
-    return (
-      <div className="flex flex-col items-end my-3 animate-in fade-in duration-200">
-        {created_at && (
-          <span className="text-[10px] text-zinc-500 mb-1 font-medium">{created_at}</span>
-        )}
-        <div className="bg-[#242429] border border-white/10 text-zinc-100 rounded-3xl px-5 py-2.5 text-xs sm:text-sm max-w-[85%] sm:max-w-[70%] shadow-lg leading-relaxed font-sans font-medium">
-          <p className="whitespace-pre-wrap">{content}</p>
-          {attachments && attachments.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-white/10">
-              {attachments.map((att, i) => (
-                <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] text-zinc-300">
-                  {att.type.startsWith('image/') ? <Image className="w-3 h-3 text-blue-400" /> : <FileCode className="w-3 h-3 text-emerald-400" />}
-                  <span className="truncate max-w-[120px] font-mono">{att.name}</span>
-                  <span className="text-zinc-500 text-[9px]">{formatFileSize(att.size)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Assistant Message / Card
-  return (
-    <div className="flex gap-3 items-start my-3 animate-in fade-in duration-200">
-      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0 shadow-sm mt-0.5">
-        <Bot className="w-4 h-4 text-indigo-400" />
+  return <div className="my-3 flex gap-3 animate-in fade-in duration-200">
+    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-indigo-400/30 bg-indigo-500/10"><Bot className="h-4 w-4 text-indigo-300" /></div>
+    <div className="min-w-0 max-w-[90%] space-y-3">
+      <div className="rounded-2xl border border-white/10 bg-[#1d1d21] p-4 text-xs leading-relaxed text-zinc-300 shadow-xl">
+        {messageType === 'build' && <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-300"><Check className="h-3.5 w-3.5" /> Build complete</div>}
+        {messageType === 'plan' && <button onClick={() => id && onOpenPlan?.(id)} className="mb-2 flex w-full items-center gap-2 rounded-xl border border-indigo-400/20 bg-indigo-500/5 p-2.5 text-left hover:bg-indigo-500/10"><FileText className="h-4 w-4 text-indigo-300" /><span><b className="text-zinc-100">Plan: </b>{metadata.plan?.title || 'Project plan'}</span></button>}
+        <p className="whitespace-pre-wrap">{content}</p>
+        {metadata.files?.length ? <div className="mt-3 flex flex-wrap gap-1">{metadata.files.slice(0, 8).map((f, i) => <span key={i} className="flex items-center gap-1 rounded-md bg-white/5 px-1.5 py-1 text-[10px] text-zinc-400"><FileCode className="h-3 w-3" />{f.path}</span>)}</div> : null}
       </div>
 
-      <div className="max-w-[90%] sm:max-w-[85%] space-y-3">
-        {/* Main Assistant Card */}
-        <div className="bg-[#18181c] border border-white/10 rounded-2xl p-4 sm:p-5 text-xs sm:text-sm leading-relaxed text-zinc-200 shadow-xl backdrop-blur-xl space-y-3">
-          {/* Working Title / Header */}
-          {workingStatus ? (
-            <div className="space-y-1">
-              <div className="font-bold text-white text-sm">Working...</div>
-              <div className="text-xs text-zinc-400 font-medium">{workingStatus}</div>
-            </div>
-          ) : null}
-
-          {/* Body Content */}
-          {content && (
-            <div className="whitespace-pre-wrap font-sans leading-relaxed text-zinc-300">
-              {content}
-            </div>
-          )}
-
-          {/* Interactive Plan Card button */}
-          {planData && (
-            <div
-              onClick={onOpenPlan}
-              className="mt-2 p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer flex items-center gap-2 group"
-            >
-              <FileText className="w-4 h-4 text-indigo-400 shrink-0 group-hover:scale-110 transition-transform" />
-              <div className="truncate text-xs">
-                <span className="font-bold text-zinc-200">Plan: </span>
-                <span className="text-zinc-400">{planData.title || planData.summary}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Attachments if any */}
-          {attachments && attachments.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {attachments.map((att, i) => (
-                <div key={i} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-[10px] text-zinc-400">
-                  {att.type.startsWith('image/') ? <Image className="w-3 h-3 text-blue-400" /> : <FileCode className="w-3 h-3 text-zinc-400" />}
-                  <span>{att.name}</span>
-                  <span className="text-zinc-600">{formatFileSize(att.size)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Interactive Questionnaire Card (Screenshot 5 matching!) */}
-        {questions && questions.length > 0 && currentQ && (
-          <div className="bg-[#1e1e24] border border-white/10 rounded-2xl p-5 shadow-2xl space-y-4 animate-in fade-in duration-300">
-            <div className="text-xs sm:text-sm font-semibold text-zinc-100 leading-snug">
-              {currentQ.question}
-            </div>
-
-            <div className="space-y-2">
-              {currentQ.options.map((optText, optIdx) => {
-                let title = optText;
-                let desc = '';
-                if (optText.includes(' — ')) {
-                  const parts = optText.split(' — ');
-                  title = parts[0];
-                  desc = parts.slice(1).join(' — ');
-                } else if (optText.includes(' - ')) {
-                  const parts = optText.split(' - ');
-                  title = parts[0];
-                  desc = parts.slice(1).join(' - ');
-                }
-
-                const isCustom = title.toLowerCase().startsWith('write your own');
-                const isSelected = answers[currentQ.id] === optText || (isCustom && answers[currentQ.id]?.startsWith('custom:'));
-
-                return (
-                  <div key={optIdx} className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!isCustom) {
-                          handleOptionClick(currentQ.id, optText);
-                        } else {
-                          handleOptionClick(currentQ.id, `custom:${customText[currentQ.id] || ''}`);
-                        }
-                      }}
-                      className={`w-full text-left p-3 rounded-xl border transition-all flex items-start gap-3 ${
-                        isSelected
-                          ? 'border-blue-500/60 bg-blue-500/10 text-white font-medium shadow-md'
-                          : 'border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:border-white/20'
-                      }`}
-                    >
-                      {/* Radio Icon */}
-                      <div className={`w-4 h-4 rounded-full border shrink-0 mt-0.5 flex items-center justify-center transition-colors ${
-                        isSelected ? 'border-blue-500 bg-blue-500' : 'border-zinc-500 bg-transparent'
-                      }`}>
-                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
-
-                      <div className="flex-1">
-                        <div className="text-xs font-semibold text-zinc-100">{title}</div>
-                        {desc && <div className="text-[11px] text-zinc-400 mt-0.5 leading-normal">{desc}</div>}
-                      </div>
-                    </button>
-
-                    {/* Write your own input box */}
-                    {isCustom && isSelected && (
-                      <div className="ml-7 mt-1">
-                        <input
-                          type="text"
-                          value={customText[currentQ.id] || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setCustomText(prev => ({ ...prev, [currentQ.id]: val }));
-                            handleOptionClick(currentQ.id, `custom:${val}`);
-                          }}
-                          placeholder="Type your requirements..."
-                          className="w-full bg-[#141417] border border-white/15 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-blue-500 font-sans"
-                          autoFocus
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Questionnaire Action Footer */}
-            <div className="flex items-center justify-between pt-2 border-t border-white/10">
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={currentQIndex === 0}
-                  onClick={() => setCurrentQIndex(prev => Math.max(0, prev - 1))}
-                  className="p-1.5 rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:text-white disabled:opacity-30 transition-colors"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  disabled={currentQIndex >= questions.length - 1}
-                  onClick={() => setCurrentQIndex(prev => Math.min(questions.length - 1, prev + 1))}
-                  className="p-1.5 rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:text-white disabled:opacity-30 transition-colors"
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-                <span className="text-[10px] text-zinc-500 ml-1 font-mono">
-                  {currentQIndex + 1}/{questions.length}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onPlanSubmit) onPlanSubmit(answers);
-                  }}
-                  className="text-xs text-zinc-400 hover:text-white px-2.5 py-1 rounded-lg transition-colors"
-                >
-                  Skip all
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (currentQIndex < questions.length - 1) {
-                      setCurrentQIndex(prev => prev + 1);
-                    } else {
-                      if (onPlanSubmit) onPlanSubmit(answers);
-                    }
-                  }}
-                  className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md active:scale-95 transition-all flex items-center gap-1"
-                >
-                  <span>{currentQIndex < questions.length - 1 ? 'Next' : 'Confirm & Build'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      {messageType === 'plan' && question && status === 'awaiting_answers' && <div className="rounded-2xl border border-white/10 bg-[#242429] p-4 shadow-xl">
+        <p className="mb-3 text-sm font-semibold text-zinc-100">{question.question}</p>
+        <div className="space-y-2">{question.options.map((option, i) => {
+          const own = option.toLowerCase().startsWith('write your own'); const selected = answers[question.id] === option || (own && answers[question.id]?.startsWith('custom:'));
+          return <div key={i}><button onClick={() => select(own ? `custom:${custom[question.id] || ''}` : option)} className={`flex w-full items-start gap-2 rounded-xl border p-2.5 text-left ${selected ? 'border-blue-400/70 bg-blue-500/10' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}><span className={`mt-0.5 h-3.5 w-3.5 rounded-full border ${selected ? 'border-blue-400 bg-blue-400' : 'border-zinc-500'}`} /><span className="text-xs">{option}</span></button>
+            {own && selected && <input value={custom[question.id] || ''} onChange={e => { const next = { ...custom, [question.id]: e.target.value }; setCustom(next); select(`custom:${e.target.value}`); }} placeholder="Write your requirements…" className="mt-2 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs outline-none" />}</div>;
+        })}</div>
+        <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3"><div className="flex gap-1"><button disabled={!index} onClick={() => setIndex(index - 1)} className="p-1 text-zinc-400 disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button><span className="py-1 text-[10px] text-zinc-500">{index + 1}/{questions.length}</span><button disabled={index === questions.length - 1} onClick={() => setIndex(index + 1)} className="p-1 text-zinc-400 disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button></div>
+          <div className="flex gap-2"><button onClick={() => save({})} className="text-xs text-zinc-400">Skip all</button><button onClick={() => index < questions.length - 1 ? setIndex(index + 1) : save()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">{index < questions.length - 1 ? 'Next' : 'Review plan'}</button></div></div>
+      </div>}
+      {messageType === 'plan' && status === 'awaiting_approval' && <button onClick={() => id && onApprovePlan?.(id)} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500"><Check className="h-3.5 w-3.5" />Approve & build</button>}
+      {messageType === 'plan' && status === 'approved' && <div className="flex items-center gap-2 text-xs text-indigo-300"><Loader2 className="h-3.5 w-3.5 animate-spin" />Building approved plan…</div>}
     </div>
-  );
-};
+  </div>;
+}

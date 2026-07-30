@@ -19,6 +19,8 @@ interface Message {
     workingStatus?: string;
     planData?: any;
     questions?: any[];
+    message_type?: string;
+    metadata?: any;
 }
 
 export interface BuildResult {
@@ -106,9 +108,9 @@ export const ChatPanel = ({
     const [enableWebSearch, setEnableWebSearch] = useState(false);
     const [chatMode, setChatMode] = useState(false);
   // Plan mode state
-  const [showPlanDrawer, setShowPlanDrawer] = useState(false);
+    const [showPlanDrawer, setShowPlanDrawer] = useState(false);
   const [planPrompt, setPlanPrompt] = useState('');
-    const [execMode, setExecMode] = useState<'build' | 'plan' | 'chat'>('build');
+    const [execMode, setExecMode] = useState<'build' | 'plan' | 'chat'>('plan');
     const [showExecModeDropdown, setShowExecModeDropdown] = useState(false);
 
     // Interactive Plan & Questions State
@@ -342,7 +344,13 @@ export const ChatPanel = ({
         if (sessionId) {
             aiApi.getMessages(sessionId).then(data => {
                 if (Array.isArray(data)) {
-                    setMessages(data);
+                    setMessages(data.map((message: any) => ({
+                        ...message,
+                        message_type: message.message_type || 'message',
+                        metadata: message.metadata || {},
+                        planData: message.metadata?.plan,
+                        questions: message.metadata?.questions
+                    })));
                     setTimeout(scrollToBottom, 100);
                 }
             }).catch(err => console.error('Failed to fetch messages:', err));
@@ -431,7 +439,8 @@ export const ChatPanel = ({
         if (execMode === 'plan') {
             setStatusLog([{ message: 'Analyzing request parameters & goals...', type: 'pending' }]);
             try {
-                const planRes = await aiApi.getPlan(finalPrompt, platform, language, model, controller.signal);
+                if (!sessionId) throw new Error('Create or open a project before planning.');
+                const planRes = await aiApi.getPlan(finalPrompt, sessionId, platform, language, model, controller.signal);
                 if (planRes) {
                     setPlanningData(planRes);
                     setActiveQuestionIndex(0);
@@ -439,21 +448,19 @@ export const ChatPanel = ({
                     setPlanPrompt(finalPrompt);
                     setStatusLog([{ message: 'Plan & clarifying questions generated', type: 'done' }]);
 
-                    setMessages(prev => [
-                        ...prev,
-                        {
-                            role: 'assistant',
-                            content: `Reviewing request parameters and goals. Here is the blueprint plan and options for how we should build this:`,
-                            workingStatus: 'Reviewing request parameters and goals',
-                            planData: planRes.plan,
-                            questions: planRes.questions
-                        }
-                    ]);
+                    const savedMessage = planRes.message ? {
+                        ...planRes.message,
+                        message_type: 'plan', metadata: planRes.message.metadata || { plan: planRes.plan, questions: planRes.questions },
+                        planData: planRes.plan, questions: planRes.questions
+                    } : { role: 'assistant' as const, content: planRes.plan?.summary || '', message_type: 'plan', metadata: { plan: planRes.plan, questions: planRes.questions, answers: {}, status: 'awaiting_answers' } };
+                    setMessages(prev => [...prev, savedMessage]);
+                    setShowPlanDrawer(true);
                 }
             } catch (planErr: any) {
                 console.error('Plan failed:', planErr);
-                setStatusLog([{ message: 'Proceeding directly to build...', type: 'error' }]);
-                runBuildGeneration(finalPrompt);
+                setStatusLog([{ message: planErr?.message || 'Unable to create a plan. Please try again.', type: 'error' }]);
+                showNotification(planErr?.message || 'Unable to create a plan.', 'error');
+                return;
                 return;
             } finally {
                 setLoading(false);
@@ -464,7 +471,7 @@ export const ChatPanel = ({
         runBuildGeneration(finalPrompt);
     };
 
-    const runBuildGeneration = async (finalPromptOverride?: string) => {
+    const runBuildGeneration = async (finalPromptOverride?: string, approvedPlanId?: number) => {
         const userMsg = messages[messages.length - 1]?.content || prompt;
         let finalPrompt = finalPromptOverride || userMsg;
 
@@ -611,7 +618,9 @@ export const ChatPanel = ({
                 enableWebSearch,
                 imageAttachments.length > 0 ? imageAttachments : undefined,
                 fileContextEntries.length > 0 ? fileContextEntries : undefined,
-                chatMode
+                chatMode,
+                Boolean(approvedPlanId),
+                approvedPlanId
             );
         } catch (fetchErr: any) {
             if (fetchErr.name === 'AbortError') {
@@ -710,7 +719,7 @@ export const ChatPanel = ({
 
             setMessages(prev => [
                 ...prev,
-                { role: 'assistant', content: summaryText, files: result.files }
+                { role: 'assistant', content: summaryText, files: result.files, message_type: 'build', metadata: { files: result.files.map((file: any) => ({ path: file.path, size: file.content?.length || 0 })), status: 'completed' } }
             ]);
 
             await new Promise(r => setTimeout(r, 400));
@@ -723,6 +732,33 @@ export const ChatPanel = ({
             ]);
         }
         setLoading(false);
+    };
+
+    const handleSavePlan = async (messageId: number, answers: Record<string, string>) => {
+        if (!sessionId) return;
+        const result = await aiApi.updatePlan(messageId, sessionId, answers, 'awaiting_approval');
+        if (result.error) return showNotification(result.error, 'error');
+        setSelectedAnswers(answers);
+        setMessages(prev => prev.map(message => message.id === messageId ? {
+            ...message,
+            metadata: { ...(message.metadata || {}), answers, status: 'awaiting_approval' }
+        } : message).concat({ role: 'assistant', content: 'Answers saved. Plan ready for approval.', message_type: 'timeline', metadata: { event: 'awaiting_approval' } }));
+        setShowPlanDrawer(true);
+    };
+
+    const handleApprovePlan = async (messageId: number) => {
+        if (!sessionId || loading) return;
+        const planMessage = messages.find(message => message.id === messageId);
+        const answers = planMessage?.metadata?.answers || selectedAnswers;
+        const update = await aiApi.updatePlan(messageId, sessionId, answers, 'approved');
+        if (update.error) return showNotification(update.error, 'error');
+        setMessages(prev => prev.map(message => message.id === messageId ? {
+            ...message, metadata: { ...(message.metadata || {}), answers, status: 'approved' }
+        } : message).concat({ role: 'assistant', content: 'Plan approved. Building your project now.', message_type: 'timeline', metadata: { event: 'approved' } }));
+        setPlanningData({ plan: planMessage?.metadata?.plan || planMessage?.planData, questions: planMessage?.metadata?.questions || [] });
+        setSelectedAnswers(answers);
+        setPlanApproved(true);
+        await runBuildGeneration(planPrompt || messages.filter(message => message.role === 'user').slice(-1)[0]?.content || '', messageId);
     };
 
     if (compact) {
@@ -846,7 +882,16 @@ export const ChatPanel = ({
     }
 
     return (
-        <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <div className="relative flex-1 flex flex-col h-full overflow-hidden">
+            <div className="flex items-center justify-end gap-2 px-3 py-2 border-b border-white/5">
+                <button onClick={() => setShowPlanDrawer(!showPlanDrawer)} className="rounded-lg border border-white/10 px-2 py-1 text-[10px] text-zinc-300 hover:bg-white/5">Plan & timeline</button>
+                <button onClick={async () => { if (sessionId && window.confirm('Clear this project conversation? This cannot be undone.')) { const result = await aiApi.clearMessages(sessionId); if (!result.error) { setMessages([]); setPlanningData(null); } } }} className="rounded-lg px-2 py-1 text-[10px] text-zinc-500 hover:text-red-300">Clear</button>
+            </div>
+            {showPlanDrawer && <aside className="absolute inset-y-0 right-0 z-40 w-[min(360px,92%)] overflow-y-auto border-l border-white/10 bg-[#17171b] p-4 shadow-2xl">
+                <div className="mb-4 flex items-center justify-between"><b className="text-sm">Plan</b><button onClick={() => setShowPlanDrawer(false)} className="text-zinc-400">×</button></div>
+                {messages.filter(message => message.message_type === 'plan').slice(-1).map(message => <div key={message.id} className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs"><h3 className="font-semibold text-zinc-100">{message.metadata?.plan?.title}</h3><p className="mt-2 whitespace-pre-wrap text-zinc-400">{message.metadata?.plan?.summary}</p><p className="mt-3 text-[10px] uppercase tracking-wide text-indigo-300">{String(message.metadata?.status || 'awaiting answers').replace('_', ' ')}</p></div>)}
+                <h3 className="mt-6 mb-2 text-xs font-semibold text-zinc-200">Timeline</h3><div className="space-y-2">{messages.filter(message => message.message_type === 'timeline' || message.message_type === 'build' || message.message_type === 'plan').map(message => <div key={`${message.id}-${message.created_at}`} className="border-l border-indigo-400/40 pl-3 text-[11px] text-zinc-400"><p className="text-zinc-200">{message.message_type === 'timeline' ? message.content : message.message_type === 'plan' ? 'Plan created' : 'Build completed'}</p><p className="text-[10px] text-zinc-600">{message.created_at ? new Date(message.created_at).toLocaleString() : 'Just now'}</p></div>)}</div>
+            </aside>}
             <div className="flex-1 overflow-y-auto mb-2 space-y-2">
                 {messages.length === 0 && statusLog.length === 0 && !buildResult && (
                     <div className="flex flex-col items-center justify-center h-full text-center px-4">
@@ -895,18 +940,16 @@ export const ChatPanel = ({
     return (
         <React.Fragment key={i}>
             <ChatMessage
+                id={msg.id}
                 role={msg.role}
                 content={msg.content}
                 created_at={msg.created_at}
                 attachments={msg.attachments}
-                workingStatus={msg.workingStatus}
-                planData={msg.planData}
-                questions={msg.questions}
-                onPlanSubmit={(answers) => {
-                    setSelectedAnswers(answers);
-                    setPlanApproved(true);
-                    runBuildGeneration(prompt || msg.content);
-                }}
+                messageType={msg.message_type}
+                metadata={msg.metadata || { plan: msg.planData, questions: msg.questions }}
+                onSavePlan={handleSavePlan}
+                onApprovePlan={handleApprovePlan}
+                onOpenPlan={() => setShowPlanDrawer(true)}
             />
             {showFileChips && (
                 <FileChipsSummary created={generatedFiles.created} edited={generatedFiles.edited} />
