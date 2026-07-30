@@ -97,28 +97,6 @@ function parseMetadata(metadata: any) {
     return metadata;
 }
 
-function fallbackPlanForPrompt(prompt: string) {
-    const topic = prompt.replace(/https?:\/\/[^\s]+/g, '').trim().slice(0, 60) || 'this project';
-    return {
-        plan: {
-            title: `Plan for ${topic}`,
-            summary: `Project plan for ${prompt}`,
-            components: [
-                { name: 'Core features', desc: 'Main user-facing behavior and implementation files' },
-                { name: 'UI and integration', desc: 'Interface, project structure, and supporting configuration' }
-            ],
-            designDirection: ['Clean project structure', 'Focused implementation based on the request']
-        },
-        questions: [
-            {
-                id: 'q1',
-                question: `How much should I build for ${topic}?`,
-                options: ['Complete working version', 'Core feature only', 'Just scaffold the project', 'Write your own...']
-            }
-        ]
-    };
-}
-
 export const ChatPanel = ({
     sessionId,
     onCodeGenerated,
@@ -493,17 +471,17 @@ export const ChatPanel = ({
                 const planRes = await aiApi.getPlan(finalPrompt, sessionId, platform, language, model, controller.signal, enableWebSearch);
                 if (planRes?.error) throw new Error(planRes.error);
                 const messageMetadata = parseMetadata(planRes?.message?.metadata);
-                const fallback = fallbackPlanForPrompt(finalPrompt);
                 const normalizedPlan = planRes?.plan?.title && planRes?.plan?.summary
                     ? planRes.plan
                     : messageMetadata.plan?.title && messageMetadata.plan?.summary
                         ? messageMetadata.plan
-                        : fallback.plan;
+                        : null;
                 const normalizedQuestions = Array.isArray(planRes?.questions)
                     ? planRes.questions
                     : Array.isArray(messageMetadata.questions)
                         ? messageMetadata.questions
-                        : fallback.questions;
+                        : [];
+                if (!normalizedPlan) throw new Error('AI did not return a usable plan. Please try again.');
                 const normalizedMetadata = {
                     plan: normalizedPlan,
                     questions: normalizedQuestions,
@@ -520,9 +498,10 @@ export const ChatPanel = ({
 
                     const savedMessage = planRes.message ? {
                         ...planRes.message,
+                        id: planRes.message.id || -Date.now(),
                         message_type: 'plan', metadata: normalizedMetadata,
                         planData: normalizedPlan, questions: normalizedQuestions
-                    } : { role: 'assistant' as const, content: normalizedPlan.summary || '', message_type: 'plan', metadata: normalizedMetadata };
+                    } : { id: -Date.now(), role: 'assistant' as const, content: normalizedPlan.summary || '', message_type: 'plan', metadata: normalizedMetadata };
                     setMessages(prev => [...prev, savedMessage]);
                     onPlanCreated?.(formatPlanMarkdown(normalizedPlan, normalizedQuestions));
                 }
@@ -806,8 +785,10 @@ export const ChatPanel = ({
 
     const handleSavePlan = async (messageId: number, answers: Record<string, string>) => {
         if (!sessionId) return;
-        const result = await aiApi.updatePlan(messageId, sessionId, answers, 'awaiting_approval');
-        if (result.error) return showNotification(result.error, 'error');
+        if (messageId > 0) {
+            const result = await aiApi.updatePlan(messageId, sessionId, answers, 'awaiting_approval');
+            if (result.error) return showNotification(result.error, 'error');
+        }
         setSelectedAnswers(answers);
         setMessages(prev => prev.map(message => message.id === messageId ? {
             ...message,
@@ -819,15 +800,17 @@ export const ChatPanel = ({
         if (!sessionId || loading) return;
         const planMessage = messages.find(message => message.id === messageId);
         const answers = planMessage?.metadata?.answers || selectedAnswers;
-        const update = await aiApi.updatePlan(messageId, sessionId, answers, 'approved');
-        if (update.error) return showNotification(update.error, 'error');
+        if (messageId > 0) {
+            const update = await aiApi.updatePlan(messageId, sessionId, answers, 'approved');
+            if (update.error) return showNotification(update.error, 'error');
+        }
         setMessages(prev => prev.map(message => message.id === messageId ? {
             ...message, metadata: { ...(message.metadata || {}), answers, status: 'approved' }
         } : message).concat({ role: 'assistant', content: 'Plan approved. Building your project now.', message_type: 'timeline', metadata: { event: 'approved' } }));
         setPlanningData({ plan: planMessage?.metadata?.plan || planMessage?.planData, questions: planMessage?.metadata?.questions || [] });
         setSelectedAnswers(answers);
         setPlanApproved(true);
-        await runBuildGeneration(planPrompt || messages.filter(message => message.role === 'user').slice(-1)[0]?.content || '', messageId);
+        await runBuildGeneration(planPrompt || messages.filter(message => message.role === 'user').slice(-1)[0]?.content || '', messageId > 0 ? messageId : undefined);
     };
 
     if (compact) {
