@@ -703,6 +703,14 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                     <ChatPanel
                         sessionId={sessionId}
                         onCodeGenerated={handleCodeGenerated}
+                        onPlanCreated={(content) => {
+                            setFiles(prev => ({ ...prev, 'plan.md': content }));
+                            setSelectedFile('plan.md');
+                        }}
+                        onOpenPlanFile={() => {
+                            if (files['plan.md']) setSelectedFile('plan.md');
+                            else loadFiles(sessionId);
+                        }}
                         language={language}
                         platform={platform}
                         model={model}
