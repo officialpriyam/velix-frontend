@@ -456,6 +456,9 @@ export const ChatPanel = ({
                 if (!sessionId) throw new Error('Create or open a project before planning.');
                 const planRes = await aiApi.getPlan(finalPrompt, sessionId, platform, language, model, controller.signal, enableWebSearch);
                 if (planRes?.error) throw new Error(planRes.error);
+                if (!planRes?.plan?.title || !planRes?.plan?.summary || !Array.isArray(planRes.questions)) {
+                    throw new Error('Plan response was incomplete. Please try again.');
+                }
                 if (planRes) {
                     setPlanningData(planRes);
                     setActiveQuestionIndex(0);
@@ -487,6 +490,7 @@ export const ChatPanel = ({
     };
 
     const runBuildGeneration = async (finalPromptOverride?: string, approvedPlanId?: number) => {
+        const effectiveChatMode = execMode === 'chat' || chatMode;
         const userMsg = messages[messages.length - 1]?.content || prompt;
         let finalPrompt = finalPromptOverride || userMsg;
 
@@ -535,7 +539,7 @@ export const ChatPanel = ({
             { message: 'Analyzing request...', type: 'done' }
         ];
 
-        if (!chatMode) {
+        if (!effectiveChatMode) {
             setStatusLog([...logs, { message: `Loading ${skillLabel} ${modeLabel.toLowerCase()} skills...`, type: 'pending' }]);
             await new Promise(r => setTimeout(r, 400));
 
@@ -573,7 +577,7 @@ export const ChatPanel = ({
         const hasImages = attachedFiles.some(f => f.type.startsWith('image/'));
         const fileContextCount = projectFiles ? Object.keys(projectFiles).filter(p => !p.startsWith('.')).length : 0;
 
-        if (!chatMode) {
+        if (!effectiveChatMode) {
             if (hasImages) {
                 logs.push({ message: `Vision: ${attachedFiles.filter(f => f.type.startsWith('image/')).length} image(s) attached`, type: 'done' });
                 setStatusLog([...logs]);
@@ -606,7 +610,7 @@ export const ChatPanel = ({
         }
         setStatusLog([...logs]);
 
-        const genLabel = chatMode ? 'Thinking...' : isConfig ? 'Generating config...' : isDatapack ? 'Generating datapack...' : isScripting ? 'Generating commands...' : 'Generating code...';
+        const genLabel = effectiveChatMode ? 'Thinking...' : isConfig ? 'Generating config...' : isDatapack ? 'Generating datapack...' : isScripting ? 'Generating commands...' : 'Generating code...';
         logs.push({ message: genLabel, type: 'pending' });
         setStatusLog([...logs]);
 
@@ -633,7 +637,7 @@ export const ChatPanel = ({
                 enableWebSearch,
                 imageAttachments.length > 0 ? imageAttachments : undefined,
                 fileContextEntries.length > 0 ? fileContextEntries : undefined,
-                chatMode,
+                effectiveChatMode,
                 Boolean(approvedPlanId),
                 approvedPlanId
             );
@@ -675,7 +679,7 @@ export const ChatPanel = ({
             });
         }
 
-        if (chatMode) {
+        if (effectiveChatMode) {
             // Chat mode: just show conversational response
             setStatusLog([]);
             setMessages(prev => [
@@ -1124,7 +1128,7 @@ export const ChatPanel = ({
                                 handleSend();
                             }
                         }}
-                        placeholder={isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : attachedFiles.length > 0 ? "Add a message about the uploaded files..." : "Describe what you want to build..."}
+                        placeholder={execMode === 'chat' ? "Ask me anything..." : isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : attachedFiles.length > 0 ? "Add a message about the uploaded files..." : "Describe what you want to build..."}
                         className="neu-input w-full text-xs text-foreground rounded-2xl p-4 pr-20 outline-none transition-all resize-none h-20"
                     />
                     <div className="absolute right-3 bottom-3 flex items-center gap-1.5 z-20">

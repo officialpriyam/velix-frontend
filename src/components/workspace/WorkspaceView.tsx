@@ -359,18 +359,21 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
         }
     };
 
-    const loadFiles = async (id: string) => {
+    const loadFiles = async (id: string, preferredFile?: string) => {
         try {
             const loadedFiles = await fileApi.getFiles(id);
+            if (!loadedFiles || typeof loadedFiles !== 'object' || Array.isArray(loadedFiles) || loadedFiles.error) {
+                throw new Error(loadedFiles?.error || 'Failed to load project files.');
+            }
             const normalizedFiles: { [path: string]: string } = {};
             Object.entries(loadedFiles).forEach(([p, c]) => {
                 normalizedFiles[p.replace(/\\/g, '/')] = c as string;
             });
             setFiles(normalizedFiles);
-            const firstFile = Object.keys(normalizedFiles)[0];
-            if (firstFile) setSelectedFile(firstFile);
+            const selected = preferredFile && normalizedFiles[preferredFile] !== undefined ? preferredFile : Object.keys(normalizedFiles)[0];
+            if (selected) setSelectedFile(selected);
         } catch (err) {
-            showNotification('Failed to load project files.', 'error');
+            showNotification(err instanceof Error ? err.message : 'Failed to load project files.', 'error');
         }
     };
 
@@ -709,7 +712,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                         }}
                         onOpenPlanFile={() => {
                             if (files['plan.md']) setSelectedFile('plan.md');
-                            else loadFiles(sessionId);
+                            else loadFiles(sessionId, 'plan.md');
                         }}
                         language={language}
                         platform={platform}
