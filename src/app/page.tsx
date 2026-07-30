@@ -17,6 +17,7 @@ import {
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatPanel } from '@/components/ChatPanel';
+import { ModelSelector } from '@/components/ModelSelector';
 import { ProjectTypeModal } from '@/components/ProjectTypeModal';
 import { TopHeader, useAuth, SharedModals, Footer, cn } from '@/components/AppShell';
 import { fileApi, aiApi } from '@/lib/api';
@@ -60,10 +61,8 @@ function HomeContent() {
     const [language, setLanguage] = useState('java');
     const [isProjectTypeOpen, setIsProjectTypeOpen] = useState(false);
 
-    const [model, setModel] = useState('anthropic/claude-3.5-sonnet');
-    const [models, setModels] = useState<{ id: string; name: string; provider?: string; description?: string }[]>([]);
+    const [model, setModel] = useState('priyx-ultra');
     const [showModelDropdown, setShowModelDropdown] = useState(false);
-    const [modelSearch, setModelSearch] = useState('');
 
     const [greeting, setGreeting] = useState("Hello");
     useEffect(() => {
@@ -74,23 +73,13 @@ function HomeContent() {
     }, []);
 
     useEffect(() => {
-        aiApi.getModels().then((data: any) => {
-            if (Array.isArray(data) && data.length > 0) {
-                setModels(data);
-                const defaultModel = data.find((m: any) => m.id.includes('claude-3-5-sonnet'))?.id || data[0].id;
-                setModel(defaultModel);
-            }
-        }).catch(err => console.error('Failed to fetch models:', err));
-    }, []);
-
-    useEffect(() => {
         if (view === 'projects') fetchProjects();
     }, [view]);
 
     // Close model dropdown on outside click
     useEffect(() => {
         if (!showModelDropdown) return;
-        const handler = () => { setShowModelDropdown(false); setModelSearch(''); };
+        const handler = () => { setShowModelDropdown(false); };
         document.addEventListener('click', handler);
         return () => document.removeEventListener('click', handler);
     }, [showModelDropdown]);
@@ -147,7 +136,13 @@ function HomeContent() {
         } catch (err) { console.error("Failed", err); }
     };
 
-    const selectedModelName = models.find(m => m.id === model)?.name || model;
+    const selectedModelName = model === 'priyx-lite' ? 'Priyx Lite' : model === 'priyx-ultra' ? 'Priyx Ultra' : model === 'priyx-max' ? 'Priyx Max' : model;
+
+    const MODEL_TIERS = [
+        { id: 'priyx-lite', name: 'Priyx Lite', desc: 'Fast & free', color: 'emerald' },
+        { id: 'priyx-ultra', name: 'Priyx Ultra', desc: 'High quality', color: 'primary' },
+        { id: 'priyx-max', name: 'Priyx Max', desc: 'Best models', color: 'amber' },
+    ];
 
     return (
         <main className="flex flex-col min-h-screen bg-background text-foreground overflow-hidden font-sans relative">
@@ -186,59 +181,10 @@ function HomeContent() {
                                     compact={true}
                                     onPromptSubmit={handleHomePromptSubmit}
                                     modelDropdown={
-                                        <div className="relative w-fit">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); setShowModelDropdown(!showModelDropdown); }}
-                                                className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] px-3 py-1.5 text-xs text-foreground/70 flex items-center gap-1.5 hover:text-foreground transition-all"
-                                            >
-                                                <Sparkles className="w-3 h-3 text-foreground/60" />
-                                                <span>{selectedModelName.split('/').pop()?.replace('anthropic/', '').replace('openai/', '').replace('google/', '') || 'Model'}</span>
-                                                <ChevronDown className="w-3 h-3 text-zinc-500" />
-                                            </button>
-                                            {showModelDropdown && (
-                                                <div className="absolute top-full left-0 mt-2 rounded-xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] p-1.5 w-[300px] z-50 shadow-xl" onClick={(e) => e.stopPropagation()}>
-                                                    {/* Search input */}
-                                                    <div className="px-2 pb-1.5">
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Search models..."
-                                                            value={modelSearch}
-                                                            onChange={(e) => setModelSearch(e.target.value)}
-                                                            className="input-theme w-full rounded-lg px-3 py-1.5 text-xs placeholder:text-foreground/30"
-                                                            autoFocus
-                                                        />
-                                                    </div>
-                                                    <div className="max-h-72 overflow-y-auto">
-                                                        {(() => {
-                                                            const search = modelSearch.toLowerCase();
-                                                            const nvidiaModels = models.filter(m => m.provider === 'nvidia' && (!search || m.name.toLowerCase().includes(search) || m.id.toLowerCase().includes(search)));
-                                                            const openrouterModels = models.filter(m => m.provider !== 'nvidia' && (!search || m.name.toLowerCase().includes(search) || m.id.toLowerCase().includes(search)));
-                                                            const groups = [];
-                                                            if (nvidiaModels.length > 0) groups.push({ label: 'NVIDIA NIM', models: nvidiaModels });
-                                                            if (openrouterModels.length > 0) groups.push({ label: 'OpenRouter', models: openrouterModels });
-                                                            if (groups.length === 0) return <div className="px-3 py-4 text-xs text-foreground/40 text-center">No models found</div>;
-                                                            return groups.map((group, gIdx) => (
-                                                                <div key={gIdx}>
-                                                                    {gIdx > 0 && <div className="my-1 border-t border-[hsl(var(--surface-sunk))]" />}
-                                                                    <div className="px-3 py-1.5 text-[10px] text-foreground/40 uppercase font-bold tracking-wider">{group.label}</div>
-                                                                    {group.models.map(m => (
-                                                                        <button
-                                                                            key={m.id}
-                                                                            onClick={() => { setModel(m.id); setShowModelDropdown(false); setModelSearch(''); }}
-                                                                            className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-all ${model === m.id ? 'bg-[hsl(var(--surface-sunk))] text-foreground font-bold' : 'text-foreground/60 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground'}`}
-                                                                            title={m.description || m.id}
-                                                                        >
-                                                                            <div className="truncate">{m.name.split('/').pop()?.replace('anthropic/', '')}</div>
-                                                                            {m.description && <div className="text-[10px] text-foreground/40 truncate mt-0.5">{m.description}</div>}
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                            ));
-                                                        })()}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                        <ModelSelector
+                                            selectedModel={model}
+                                            onSelectModel={setModel}
+                                        />
                                     }
                                     typeDropdown={
                                         <button

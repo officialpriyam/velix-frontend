@@ -71,22 +71,23 @@ function getFileType(filename: string): string {
 export const ChatPanel = ({
     sessionId,
     onCodeGenerated,
-    model = 'anthropic/claude-3-sonnet',
-    language = 'java',
-    platform = 'minecraft',
     compact = false,
     onPromptSubmit,
-    initialPrompt,
-    onInitialPromptHandled,
-    highlight = '',
+    projectFiles,
+    platform = 'minecraft',
+    language = 'java',
+    model = 'priyx-ultra',
     modelDropdown,
     typeDropdown,
+    highlight = '',
+    autoCompile = true,
     buildResult,
     compiling = false,
     onClearBuildResult,
     onAutoFix,
     onDownloadArtifact,
-    projectFiles
+    initialPrompt,
+    onInitialPromptHandled
 }: ChatPanelProps) => {
     const { showNotification } = useNotification();
     const router = useRouter();
@@ -97,6 +98,18 @@ export const ChatPanel = ({
     const [generatedFiles, setGeneratedFiles] = useState<{ created: string[]; edited: string[] }>({ created: [], edited: [] });
     const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: string; content: string; size: number }[]>([]);
     const [enableWebSearch, setEnableWebSearch] = useState(false);
+    const [chatMode, setChatMode] = useState(false);
+    const [execMode, setExecMode] = useState<'build' | 'plan' | 'chat'>('build');
+    const [showExecModeDropdown, setShowExecModeDropdown] = useState(false);
+
+    // Interactive Plan & Questions State
+    const [planningData, setPlanningData] = useState<{ questions: any[]; plan: any } | null>(null);
+    const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+    const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
+    const [customAnswerText, setCustomAnswerText] = useState('');
+    const [planApproved, setPlanApproved] = useState(false);
+    const [showPlanDrawer, setShowPlanDrawer] = useState(false);
+    const [searchStatus, setSearchStatus] = useState<{ queries: string[]; sources: { title: string; url: string }[] } | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -393,6 +406,7 @@ export const ChatPanel = ({
         setAttachedFiles([]);
         setLoading(true);
         setGeneratedFiles({ created: [], edited: [] });
+        setSearchStatus(null);
 
         // Create abort controller for this request
         const controller = new AbortController();
@@ -404,6 +418,43 @@ export const ChatPanel = ({
             const attachments = attachedFiles.map(f => ({ name: f.name, type: f.type, size: f.size }));
             return [...prev, { role: 'user', content: userMsg, attachments: attachments.length > 0 ? attachments : undefined }];
         });
+
+        if (execMode === 'plan') {
+            setStatusLog([{ message: 'Analyzing marketplace site patterns & planning blueprint...', type: 'pending' }]);
+            try {
+                const planRes = await aiApi.getPlan(finalPrompt, platform, language, model, controller.signal);
+                if (planRes) {
+                    setPlanningData(planRes);
+                    setActiveQuestionIndex(0);
+                    setPlanApproved(false);
+                    setStatusLog([{ message: 'Plan & questions generated', type: 'done' }]);
+                }
+            } catch (planErr: any) {
+                console.error('Plan failed:', planErr);
+                setStatusLog([{ message: 'Proceeding directly to build...', type: 'error' }]);
+                runBuildGeneration(finalPrompt);
+                return;
+            } finally {
+                setLoading(false);
+            }
+            return;
+        }
+
+        runBuildGeneration(finalPrompt);
+    };
+
+    const runBuildGeneration = async (finalPromptOverride?: string) => {
+        const userMsg = messages[messages.length - 1]?.content || prompt;
+        let finalPrompt = finalPromptOverride || userMsg;
+
+        if (planningData && planningData.plan) {
+            const answersSummary = Object.entries(selectedAnswers).map(([qId, ans]) => `- ${qId}: ${ans}`).join('\n');
+            finalPrompt = `[PROJECT BLUEPRINT]:\nTitle: ${planningData.plan.title}\nSummary: ${planningData.plan.summary}\nSelected Preferences:\n${answersSummary}\n\n[USER REQUEST]:\n${finalPrompt}`;
+        }
+
+        setLoading(true);
+        setGeneratedFiles({ created: [], edited: [] });
+        setSearchStatus(null);
 
         if (typeof window !== 'undefined' && window.location.search) {
             const cleanUrl = window.location.pathname;
@@ -437,56 +488,61 @@ export const ChatPanel = ({
         ]);
         await new Promise(r => setTimeout(r, 500));
 
-        setStatusLog([
-            { message: 'Analyzing request...', type: 'done' },
-            { message: `Loading ${skillLabel} ${modeLabel.toLowerCase()} skills...`, type: 'pending' }
-        ]);
-        await new Promise(r => setTimeout(r, 400));
-
-        const skillDetails: Record<string, string[]> = {
-            minecraft: isConfig
-                ? ['EssentialsX Ops', 'Server Admin', 'Config Generation']
-                : isDatapack
-                    ? ['Datapack Dev', 'Commands/Scripting', 'World Generation']
-                    : isScripting
-                        ? ['Commands/Scripting', 'Scoreboard', 'Execute Chains']
-                        : ['Plugin Dev (Paper/Spigot)', 'Modding (NeoForge/Fabric)', 'Datapacks', 'Commands/Scripting'],
-            hytale: ['Plugin Basics', 'Custom Blocks', 'Custom Items', 'Custom Entities', 'Events API'],
-            discord: ['Bot Framework', 'Commands', 'Events']
-        };
-        const skills = skillDetails[platform] || [];
-
         const logs: { message: string; type: 'pending' | 'done' | 'error' }[] = [
-            { message: 'Analyzing request...', type: 'done' },
-            { message: `Loading ${skillLabel} ${modeLabel.toLowerCase()} skills...`, type: 'done' }
+            { message: 'Analyzing request...', type: 'done' }
         ];
-        for (const skill of skills.slice(0, 3)) {
-            logs.push({ message: `  ${skill}`, type: 'pending' });
-            setStatusLog([...logs]);
-            await new Promise(r => setTimeout(r, 200));
-            if (controller.signal.aborted) { setLoading(false); return; }
-            logs[logs.length - 1] = { message: `  ${skill}`, type: 'done' };
-            setStatusLog([...logs]);
-        }
-        if (skills.length > 3) {
+
+        if (!chatMode) {
+            setStatusLog([...logs, { message: `Loading ${skillLabel} ${modeLabel.toLowerCase()} skills...`, type: 'pending' }]);
+            await new Promise(r => setTimeout(r, 400));
+
+            const skillDetails: Record<string, string[]> = {
+                minecraft: isConfig
+                    ? ['EssentialsX Ops', 'Server Admin', 'Config Generation']
+                    : isDatapack
+                        ? ['Datapack Dev', 'Commands/Scripting', 'World Generation']
+                        : isScripting
+                            ? ['Commands/Scripting', 'Scoreboard', 'Execute Chains']
+                            : ['Plugin Dev (Paper/Spigot)', 'Modding (NeoForge/Fabric)', 'Datapacks', 'Commands/Scripting'],
+                hytale: ['Plugin Basics', 'Custom Blocks', 'Custom Items', 'Custom Entities', 'Events API'],
+                discord: ['Bot Framework', 'Commands', 'Events']
+            };
+            const skills = skillDetails[platform] || [];
+
+            logs.push({ message: `Loading ${skillLabel} ${modeLabel.toLowerCase()} skills...`, type: 'done' });
+            for (const skill of skills.slice(0, 3)) {
+                logs.push({ message: `  ${skill}`, type: 'pending' });
+                setStatusLog([...logs]);
+                await new Promise(r => setTimeout(r, 200));
+                if (controller.signal.aborted) { setLoading(false); return; }
+                logs[logs.length - 1] = { message: `  ${skill}`, type: 'done' };
+                setStatusLog([...logs]);
+            }
+            if (skills.length > 3) {
             logs.push({ message: `  +${skills.length - 3} more skills`, type: 'done' });
             setStatusLog([...logs]);
+        }
+        } else {
+            // Chat mode: minimal status
+            setStatusLog([...logs, { message: 'Chat mode — just talking, no code gen', type: 'done' }]);
         }
 
         const hasImages = attachedFiles.some(f => f.type.startsWith('image/'));
         const fileContextCount = projectFiles ? Object.keys(projectFiles).filter(p => !p.startsWith('.')).length : 0;
 
-        if (hasImages) {
-            logs.push({ message: `Vision: ${attachedFiles.filter(f => f.type.startsWith('image/')).length} image(s) attached`, type: 'done' });
-            setStatusLog([...logs]);
-        }
-        if (enableWebSearch) {
-            logs.push({ message: 'Web search enabled', type: 'done' });
-            setStatusLog([...logs]);
-        }
-        if (fileContextCount > 0) {
-            logs.push({ message: `Project context: ${fileContextCount} file(s)`, type: 'done' });
-            setStatusLog([...logs]);
+        if (!chatMode) {
+            if (hasImages) {
+                logs.push({ message: `Vision: ${attachedFiles.filter(f => f.type.startsWith('image/')).length} image(s) attached`, type: 'done' });
+                setStatusLog([...logs]);
+            }
+            if (enableWebSearch) {
+                logs.push({ message: 'Web search enabled', type: 'done' });
+                setStatusLog([...logs]);
+            }
+            if (fileContextCount > 0) {
+                logs.push({ message: `Project context: ${fileContextCount} file(s)`, type: 'done' });
+                setStatusLog([...logs]);
+            }
         }
 
         logs.push({ message: `Optimizing prompt...`, type: 'pending' });
@@ -507,7 +563,7 @@ export const ChatPanel = ({
         }
         setStatusLog([...logs]);
 
-        const genLabel = isConfig ? 'Generating config...' : isDatapack ? 'Generating datapack...' : isScripting ? 'Generating commands...' : 'Generating code...';
+        const genLabel = chatMode ? 'Thinking...' : isConfig ? 'Generating config...' : isDatapack ? 'Generating datapack...' : isScripting ? 'Generating commands...' : 'Generating code...';
         logs.push({ message: genLabel, type: 'pending' });
         setStatusLog([...logs]);
 
@@ -533,7 +589,8 @@ export const ChatPanel = ({
                 optimizedPrompt, language, model, sessionId || undefined, platform, controller.signal,
                 enableWebSearch,
                 imageAttachments.length > 0 ? imageAttachments : undefined,
-                fileContextEntries.length > 0 ? fileContextEntries : undefined
+                fileContextEntries.length > 0 ? fileContextEntries : undefined,
+                chatMode
             );
         } catch (fetchErr: any) {
             if (fetchErr.name === 'AbortError') {
@@ -554,10 +611,27 @@ export const ChatPanel = ({
         }
 
         if (result.creditsUsed !== undefined && result.creditsRemaining !== undefined) {
-            showNotification(`Used ${result.creditsUsed} credits. Remaining: ${result.creditsRemaining} credits.`, 'success');
+            if (result.creditsUsed > 0) {
+                showNotification(`Used ${result.creditsUsed} credits. Remaining: ${result.creditsRemaining} credits.`, 'success');
+            }
         }
 
-        if (result.files && result.files.length > 0) {
+        // Show web search status if available
+        if (result.searchQueries && result.searchQueries.length > 0) {
+            setSearchStatus({
+                queries: result.searchQueries,
+                sources: result.searchSources || []
+            });
+        }
+
+        if (chatMode) {
+            // Chat mode: just show conversational response
+            setStatusLog([]);
+            setMessages(prev => [
+                ...prev,
+                { role: 'assistant', content: result.rawResponse }
+            ]);
+        } else if (result.files && result.files.length > 0) {
             const created: string[] = [];
             const edited: string[] = [];
 
@@ -599,9 +673,17 @@ export const ChatPanel = ({
             fileLogs.push({ message: `${platformLabel} ${modeLabel} assembly complete!`, type: 'done' });
             setStatusLog([...fileLogs]);
 
+            // Build summary message instead of showing raw code
+            const createdCount = revealCreated.length;
+            const editedCount = revealEdited.length;
+            let summaryParts: string[] = [];
+            if (createdCount > 0) summaryParts.push(`${createdCount} file${createdCount > 1 ? 's' : ''} created`);
+            if (editedCount > 0) summaryParts.push(`${editedCount} file${editedCount > 1 ? 's' : ''} edited`);
+            const summaryText = `Done! I ${summaryParts.join(' and ')}. Check the files panel to see the generated code.`;
+
             setMessages(prev => [
                 ...prev,
-                { role: 'assistant', content: result.rawResponse, files: result.files }
+                { role: 'assistant', content: summaryText, files: result.files }
             ]);
 
             await new Promise(r => setTimeout(r, 400));
@@ -655,7 +737,7 @@ export const ChatPanel = ({
                     }}
                     disabled={loading}
                     className="w-full bg-transparent border-0 px-5 pt-5 text-sm focus:outline-none resize-none h-[80px] placeholder:text-foreground/30 text-foreground"
-                    placeholder={isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : attachedFiles.length > 0 ? "Add a message about the uploaded files..." : "Ask Velix to create a plugin about..."}
+                    placeholder={chatMode ? "Ask me anything..." : isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : attachedFiles.length > 0 ? "Add a message about the uploaded files..." : "Ask Velix to create a plugin about..."}
                 />
 
                 {statusLog.length > 0 && (
@@ -695,6 +777,17 @@ export const ChatPanel = ({
                         >
                             <Globe className="w-3.5 h-3.5" />
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => setChatMode(!chatMode)}
+                            className={`w-7 h-7 rounded-full border flex items-center justify-center transition-colors ${chatMode
+                                ? 'border-purple-500/30 bg-purple-500/10 text-purple-400'
+                                : 'border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] text-foreground/50 hover:text-foreground'
+                                }`}
+                            title={chatMode ? 'Chat mode ON — conversational, no code gen' : 'Chat mode OFF — generates code'}
+                        >
+                            <Bot className="w-3.5 h-3.5" />
+                        </button>
                         {modelDropdown}
                         {typeDropdown}
                     </div>
@@ -732,6 +825,40 @@ export const ChatPanel = ({
                     <div className="flex flex-col items-center justify-center h-full text-center px-4">
                         <Sparkles className="w-5 h-5 text-muted mb-2" />
                         <p className="text-xs text-muted">Describe what you want to build</p>
+                        <p className="text-[10px] text-faint mt-1">or toggle chat mode to just talk</p>
+                    </div>
+                )}
+
+                {/* Web search status */}
+                {searchStatus && searchStatus.queries.length > 0 && (
+                    <div className="mx-2 mb-2 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 animate-in fade-in duration-200">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Globe className="w-3.5 h-3.5 text-blue-400" />
+                            <span className="text-[11px] font-bold text-blue-400">Web Search</span>
+                        </div>
+                        <div className="space-y-1.5">
+                            {searchStatus.queries.map((q, i) => (
+                                <div key={i} className="flex items-center gap-2 text-[10px]">
+                                    <span className="text-foreground/40">Searched:</span>
+                                    <span className="text-foreground/70 font-medium">"{q}"</span>
+                                </div>
+                            ))}
+                        </div>
+                        {searchStatus.sources.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                                {searchStatus.sources.slice(0, 5).map((s, i) => (
+                                    <a key={i} href={s.url} target="_blank" rel="noopener noreferrer"
+                                        className="px-1.5 py-0.5 text-[9px] rounded bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 transition-colors truncate max-w-[150px]"
+                                        title={s.title}
+                                    >
+                                        {s.title.slice(0, 30)}{s.title.length > 30 ? '...' : ''}
+                                    </a>
+                                ))}
+                                {searchStatus.sources.length > 5 && (
+                                    <span className="px-1.5 py-0.5 text-[9px] text-foreground/30">+{searchStatus.sources.length - 5} more</span>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 

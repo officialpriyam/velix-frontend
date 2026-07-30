@@ -26,12 +26,12 @@ async function safeJson(res: Response) {
 }
 
 export const aiApi = {
-    generate: async (prompt: string, language: string, model?: string, sessionId?: string, platform?: string, signal?: AbortSignal, enableWebSearch?: boolean, images?: Array<{ data: string; mimeType: string }>, fileContext?: Array<{ path: string; content: string }>) => {
+    generate: async (prompt: string, language: string, model?: string, sessionId?: string, platform?: string, signal?: AbortSignal, enableWebSearch?: boolean, images?: Array<{ data: string; mimeType: string }>, fileContext?: Array<{ path: string; content: string }>, chatMode?: boolean) => {
         const res = await fetch(`${BASE_URL}/ai/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ prompt, language, model, sessionId, platform, enableWebSearch, images, fileContext }),
+            body: JSON.stringify({ prompt, language, model, sessionId, platform, enableWebSearch, images, fileContext, chatMode }),
             signal
         });
         return safeJson(res);
@@ -114,6 +114,16 @@ export const aiApi = {
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ prompt, platform, language }),
+            signal
+        });
+        return safeJson(res);
+    },
+    getPlan: async (prompt: string, platform?: string, language?: string, model?: string, signal?: AbortSignal) => {
+        const res = await fetch(`${BASE_URL}/ai/plan`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ prompt, platform, language, model }),
             signal
         });
         return safeJson(res);

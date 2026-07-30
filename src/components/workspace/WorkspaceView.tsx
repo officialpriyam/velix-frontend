@@ -117,8 +117,14 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
     const [platform, setPlatform] = useState(incomingPlatform || sessionPrefs.platform || savedPrefs.platform || 'minecraft');
     const [category, setCategory] = useState(incomingCategory || sessionPrefs.category || savedPrefs.category || 'plugins');
     const [initialPrompt, setInitialPrompt] = useState<string | null>(incomingPrompt);
-    const [model, setModel] = useState<string>(incomingModel || 'anthropic/claude-3-sonnet');
-    const [models, setModels] = useState<{ id: string; name: string }[]>([]);
+    const [model, setModel] = useState<string>(incomingModel || 'priyx-ultra');
+    const [modelTiers, setModelTiers] = useState<{
+        lite: { name: string; description: string; models: any[] };
+        pro?: { name: string; description: string; models: any[] };
+        ultra: { name: string; description: string; models: any[] };
+        max: { name: string; description: string; models: any[] };
+    } | null>(null);
+    const [selectedTier, setSelectedTier] = useState<string>('ultra');
     const [compileHistory, setCompileHistory] = useState<any[]>([]);
     const [highlight, setHighlight] = useState<string>('');
     const [internalModal, setInternalModal] = useState<ModalKind>(null);
@@ -244,7 +250,16 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
 
     useEffect(() => {
         aiApi.getModels().then(data => {
-            if (Array.isArray(data)) setModels(data);
+            if (data && data.tiers) {
+                setModelTiers(data.tiers);
+            } else if (Array.isArray(data)) {
+                // Legacy flat format fallback
+                setModelTiers({
+                    lite: { name: 'Priyx Lite', description: 'Fast & free lightweight models', models: [] },
+                    ultra: { name: 'Priyx Ultra', description: 'High-quality free models', models: data },
+                    max: { name: 'Priyx Max', description: 'Best available models', models: [] }
+                });
+            }
         }).catch(err => console.error("Failed to fetch models", err));
     }, []);
 
@@ -332,6 +347,10 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
 
     const handleModelChange = async (newModel: string) => {
         setModel(newModel);
+        // Detect tier from model ID
+        if (newModel === 'priyx-lite' || newModel === 'priyx-ultra' || newModel === 'priyx-max') {
+            setSelectedTier(newModel.replace('priyx-', ''));
+        }
         try {
             await aiApi.updateModel(sessionId, newModel);
         } catch (err) {
@@ -1316,22 +1335,104 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                             )}
 
                             {settingsTab === 'ai-model' && (
-                                <SettingsContent title="AI Model" subtitle="Configure AI model for generation">
+                                <SettingsContent title="AI Model" subtitle="Select a model tier for code generation">
                                     <div className="neu-inset rounded-xl p-4 mb-4">
                                         <div className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">Current Model</div>
                                         <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /><span className="text-sm font-bold text-foreground">{model}</span><span className="px-2 py-0.5 text-[9px] font-bold uppercase bg-primary/15 text-primary rounded">Active</span></div>
                                     </div>
-                                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">Select Model</div>
-                                    <select value={model} onChange={e => handleModelChange(e.target.value)}
-                                        className="w-full neu-input rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none appearance-none cursor-pointer">
-                                        {models.length > 0 ? (
-                                            models.map(m => <option key={m.id} value={m.id}>{m.name || m.id}</option>)
-                                        ) : (
-                                            <option value="anthropic/claude-3-sonnet">Loading models...</option>
-                                        )}
-                                    </select>
-                                    {models.length > 0 && (
-                                        <p className="text-[10px] text-faint mt-2">{models.length} models available from OpenRouter & NVIDIA</p>
+
+                                    {/* Tier Cards */}
+                                    <div className="space-y-3 mb-4">
+                                        {/* Velix Lite */}
+                                        <button
+                                            onClick={() => handleModelChange('velix-lite')}
+                                            className={`w-full text-left neu-inset rounded-xl p-4 transition-all ${
+                                                model === 'velix-lite' || model === 'priyx-lite' ? 'ring-2 ring-primary' : 'hover:ring-1 hover:ring-muted/30'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between mb-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                                        <span className="text-[10px] font-bold text-emerald-400">L</span>
+                                                    </div>
+                                                    <span className="text-sm font-bold text-foreground">Velix Lite</span>
+                                                </div>
+                                                <span className="px-2 py-0.5 text-[9px] font-bold uppercase bg-emerald-500/15 text-emerald-400 rounded">Free & Fast</span>
+                                            </div>
+                                            <p className="text-[11px] text-muted ml-8">Lightweight, fast & free models for quick code generation tasks</p>
+                                            {modelTiers?.lite?.models && modelTiers.lite.models.length > 0 && (
+                                                <div className="mt-2 ml-8 flex flex-wrap gap-1">
+                                                    {modelTiers.lite.models.slice(0, 3).map((m: any) => (
+                                                        <span key={m.id} className="px-1.5 py-0.5 text-[8px] text-faint bg-surface-sunk rounded">{m.id.split('/').pop()?.replace(/:free/g, '')}</span>
+                                                    ))}
+                                                    {modelTiers.lite.models.length > 3 && (
+                                                        <span className="px-1.5 py-0.5 text-[8px] text-faint bg-surface-sunk rounded">+{modelTiers.lite.models.length - 3}</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </button>
+
+                                        {/* Velix Pro */}
+                                        <button
+                                            onClick={() => handleModelChange('velix-pro')}
+                                            className={`w-full text-left neu-inset rounded-xl p-4 transition-all ${
+                                                model === 'velix-pro' || model === 'priyx-ultra' || model === 'velix-ultra' ? 'ring-2 ring-primary' : 'hover:ring-1 hover:ring-muted/30'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between mb-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                                                        <span className="text-[10px] font-bold text-indigo-400">P</span>
+                                                    </div>
+                                                    <span className="text-sm font-bold text-foreground">Velix Pro</span>
+                                                </div>
+                                                <span className="px-2 py-0.5 text-[9px] font-bold uppercase bg-indigo-500/15 text-indigo-400 rounded">Recommended</span>
+                                            </div>
+                                            <p className="text-[11px] text-muted ml-8">High-quality free models from OpenRouter & NVIDIA for complex coding</p>
+                                            {(modelTiers?.pro?.models || modelTiers?.ultra?.models) && (
+                                                <div className="mt-2 ml-8 flex flex-wrap gap-1">
+                                                    {(modelTiers.pro?.models || modelTiers.ultra?.models || []).slice(0, 3).map((m: any) => (
+                                                        <span key={m.id} className="px-1.5 py-0.5 text-[8px] text-faint bg-surface-sunk rounded">{m.id.split('/').pop()?.replace(/:free/g, '')}</span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </button>
+
+                                        {/* Velix Max */}
+                                        <button
+                                            onClick={() => handleModelChange('velix-max')}
+                                            className={`w-full text-left neu-inset rounded-xl p-4 transition-all ${
+                                                model === 'velix-max' || model === 'priyx-max' ? 'ring-2 ring-primary' : 'hover:ring-1 hover:ring-muted/30'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between mb-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                                        <span className="text-[10px] font-bold text-amber-400">M</span>
+                                                    </div>
+                                                    <span className="text-sm font-bold text-foreground">Velix Max</span>
+                                                </div>
+                                                <span className="px-2 py-0.5 text-[9px] font-bold uppercase bg-amber-500/15 text-amber-400 rounded">Best Power</span>
+                                            </div>
+                                            <p className="text-[11px] text-muted ml-8">Best available models — randomly selected from OpenRouter & NVIDIA NIM</p>
+                                            {modelTiers?.max?.models && modelTiers.max.models.length > 0 && (
+                                                <div className="mt-2 ml-8 flex flex-wrap gap-1">
+                                                    {modelTiers.max.models.slice(0, 4).map((m: any) => (
+                                                        <span key={m.id} className="px-1.5 py-0.5 text-[8px] text-faint bg-surface-sunk rounded">{m.id.split('/').pop()?.replace(/:free/g, '')}</span>
+                                                    ))}
+                                                    {modelTiers.max.models.length > 4 && (
+                                                        <span className="px-1.5 py-0.5 text-[8px] text-faint bg-surface-sunk rounded">+{modelTiers.max.models.length - 4}</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    {/* Model count */}
+                                    {modelTiers && (
+                                        <p className="text-[10px] text-faint text-center">
+                                            {Object.values(modelTiers).reduce((sum: number, t: any) => sum + (t.models?.length || 0), 0)} models available
+                                        </p>
                                     )}
                                 </SettingsContent>
                             )}
