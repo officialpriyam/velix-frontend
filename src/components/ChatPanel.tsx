@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import PlanDrawer from './PlanDrawer';
-import '../styles/planMode.css';
+import { ChatMessage } from './ChatMessage';
 import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square, Globe, Brain, Eye } from 'lucide-react';
 import { aiApi, copyToClipboard } from '../lib/api';
 import { useNotification } from './Notification';
@@ -41,6 +40,7 @@ interface ChatPanelProps {
     typeDropdown?: React.ReactNode;
     buildResult?: BuildResult | null;
     compiling?: boolean;
+    autoCompile?: boolean;
     onClearBuildResult?: () => void;
     onAutoFix?: (error: string) => void;
     onDownloadArtifact?: (historyId: number) => void;
@@ -113,7 +113,7 @@ export const ChatPanel = ({
     const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
     const [customAnswerText, setCustomAnswerText] = useState('');
     const [planApproved, setPlanApproved] = useState(false);
-    const [showPlanDrawer, setShowPlanDrawer] = useState(false);
+
     const [searchStatus, setSearchStatus] = useState<{ queries: string[]; sources: { title: string; url: string }[] } | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -521,7 +521,7 @@ export const ChatPanel = ({
                 logs.push({ message: `  ${skill}`, type: 'pending' });
                 setStatusLog([...logs]);
                 await new Promise(r => setTimeout(r, 200));
-                if (controller.signal.aborted) { setLoading(false); return; }
+                if (abortControllerRef.current?.signal.aborted) { setLoading(false); return; }
                 logs[logs.length - 1] = { message: `  ${skill}`, type: 'done' };
                 setStatusLog([...logs]);
             }
@@ -557,7 +557,7 @@ export const ChatPanel = ({
 
         let optimizedPrompt = finalPrompt;
         try {
-            const enhanceResult = await aiApi.enhancePrompt(finalPrompt, platform, language, controller.signal);
+            const enhanceResult = await aiApi.enhancePrompt(finalPrompt, platform, language, abortControllerRef.current?.signal);
             if (enhanceResult.enhanced && enhanceResult.enhanced !== finalPrompt) {
                 optimizedPrompt = enhanceResult.enhanced;
                 logs[logs.length - 1] = { message: `Prompt optimized`, type: 'done' };
@@ -593,7 +593,7 @@ export const ChatPanel = ({
                 : [];
 
             result = await aiApi.generate(
-                optimizedPrompt, language, model, sessionId || undefined, platform, controller.signal,
+                optimizedPrompt, language, model, sessionId || undefined, platform, abortControllerRef.current?.signal,
                 enableWebSearch,
                 imageAttachments.length > 0 ? imageAttachments : undefined,
                 fileContextEntries.length > 0 ? fileContextEntries : undefined,
@@ -881,8 +881,6 @@ export const ChatPanel = ({
         </React.Fragment>
     );
 })}
-
-                })}
 
                 {compiling && !buildResult && (
                     <div className="animate-in fade-in duration-200 rounded-xl border border-[hsl(var(--surface-sunk))] overflow-hidden">

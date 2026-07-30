@@ -200,8 +200,6 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
                                             </div>
                                         );
                                     })}
-                            </>
-
 
                                 {/* Individual Models List Header */}
                                 {flatModels.length > 0 && (
