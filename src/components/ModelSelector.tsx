@@ -57,6 +57,14 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
     const [tiersData, setTiersData] = useState<ModelTiersData | null>(null);
     const [flatModels, setFlatModels] = useState<ModelItem[]>([]);
     const [loading, setLoading] = useState(false);
+    const [expandedTier, setExpandedTier] = useState<string | null>(null); // track which tier is expanded
+
+    // Helper to pick a limited random subset of models for a tier
+    const getRandomModels = (models: ModelItem[], count: number = 3): ModelItem[] => {
+        if (!models || models.length === 0) return [];
+        const shuffled = [...models].sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, Math.min(count, models.length));
+    };
 
     useEffect(() => {
         setLoading(true);
@@ -123,55 +131,77 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
                     <div className="max-h-[320px] overflow-y-auto space-y-1.5 pr-0.5 custom-scrollbar">
                         {!search.trim() ? (
                             <>
-                                {/* Tier Presets Header */}
-                                <div className="px-2 py-1 text-[10px] font-bold text-muted uppercase tracking-wider">
-                                    Velix Model Tiers
-                                </div>
-                                {PRESET_TIERS.map(tier => {
-                                    const IconComp = tier.icon;
-                                    const isSelected = selectedModel === tier.id ||
-                                        (tier.id === 'velix-pro' && (selectedModel === 'priyx-ultra' || selectedModel === 'velix-ultra')) ||
-                                        (tier.id === 'velix-lite' && selectedModel === 'priyx-lite') ||
-                                        (tier.id === 'velix-max' && selectedModel === 'priyx-max');
-
-                                    return (
-                                        <button
-                                            key={tier.id}
-                                            type="button"
-                                            onClick={() => {
-                                                onSelectModel(tier.id);
-                                                setIsOpen(false);
-                                            }}
-                                            className={`w-full text-left p-2.5 rounded-xl text-xs transition-all flex items-start justify-between gap-2 border ${
-                                                isSelected
-                                                    ? 'bg-primary/10 border-primary/30 text-foreground font-semibold shadow-sm'
-                                                    : 'border-transparent text-foreground/70 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground'
-                                            }`}
-                                        >
-                                            <div className="flex items-start gap-2.5">
-                                                <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${
-                                                    tier.color === 'emerald' ? 'bg-emerald-500/15 text-emerald-400' :
-                                                    tier.color === 'indigo' ? 'bg-indigo-500/15 text-indigo-400' :
-                                                    'bg-amber-500/15 text-amber-400'
-                                                }`}>
-                                                    <IconComp className="w-3.5 h-3.5" />
-                                                </div>
-                                                <div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="font-bold text-foreground">{tier.name}</span>
-                                                        <span className="px-1.5 py-0.2 text-[9px] font-medium bg-[hsl(var(--surface-sunk))] text-muted rounded-full">
-                                                            {tier.badge}
-                                                        </span>
+                                    {/* Tier Presets Header */}
+                                    <div className="px-2 py-1 text-[10px] font-bold text-muted uppercase tracking-wider">
+                                        Velix Model Tiers
+                                    </div>
+                                    {PRESET_TIERS.map(tier => {
+                                        const IconComp = tier.icon;
+                                        const isTierExpanded = expandedTier === tier.id;
+                                        const tierModels = tiersData && (tier.id === 'velix-lite' ? tiersData.lite?.models : tier.id === 'velix-pro' ? tiersData.pro?.models : tier.id === 'velix-max' ? tiersData.max?.models : []);
+                                        const displayModels = getRandomModels(tierModels || [], 3);
+                                        const isSelected = selectedModel === tier.id || displayModels.some(m => m.id === selectedModel);
+                                        return (
+                                            <div key={tier.id}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (isTierExpanded) {
+                                                            // collapse
+                                                            setExpandedTier(null);
+                                                        } else {
+                                                            setExpandedTier(tier.id);
+                                                        }
+                                                    }}
+                                                    className={`w-full text-left p-2.5 rounded-xl text-xs transition-all flex items-start justify-between gap-2 border ${
+                                                        isSelected ? 'bg-primary/10 border-primary/30 text-foreground font-semibold shadow-sm' : 'border-transparent text-foreground/70 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-start gap-2.5">
+                                                        <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${
+                                                            tier.color === 'emerald' ? 'bg-emerald-500/15 text-emerald-400' :
+                                                            tier.color === 'indigo' ? 'bg-indigo-500/15 text-indigo-400' :
+                                                            'bg-amber-500/15 text-amber-400'
+                                                        }`}>
+                                                            <IconComp className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="font-bold text-foreground">{tier.name}</span>
+                                                                <span className="px-1.5 py-0.2 text-[9px] font-medium bg-[hsl(var(--surface-sunk))] text-muted rounded-full">{tier.badge}</span>
+                                                            </div>
+                                                            <div className="text-[10px] text-muted mt-0.5 leading-tight">{tier.desc}</div>
+                                                        </div>
+                                                        {isTierExpanded && <ChevronDown className="w-3 h-3 text-muted ml-auto" />}
                                                     </div>
-                                                    <div className="text-[10px] text-muted mt-0.5 leading-tight">
-                                                        {tier.desc}
+                                                    {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0 mt-1" />}
+                                                </button>
+                                                {/* Expanded model list for this tier */}
+                                                {isTierExpanded && displayModels.length > 0 && (
+                                                    <div className="ml-4 mt-2 space-y-1">
+                                                        {displayModels.map(m => (
+                                                            <button
+                                                                key={m.id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    onSelectModel(m.id);
+                                                                    setIsOpen(false);
+                                                                    setExpandedTier(null);
+                                                                }}
+                                                                className={`w-full text-left px-2 py-1 rounded-md text-xs flex items-center justify-between ${selectedModel === m.id ? 'bg-primary/10 text-foreground font-semibold' : 'text-foreground/70 hover:bg-[hsl(var(--surface-sunk))]'} `}
+                                                            >
+                                                                <span className="truncate">{m.name || m.id}</span>
+                                                                {m.id.endsWith(':free') && <span className="ml-2 px-1.5 py-0.2 text-[8px] font-bold bg-emerald-500/15 text-emerald-400 rounded">Free</span>}
+                                                                {m.provider === 'nvidia' && <span className="ml-2 px-1.5 py-0.2 text-[8px] font-bold bg-green-500/15 text-green-400 rounded">NVIDIA</span>}
+                                                            </button>
+                                                        ))}
                                                     </div>
-                                                </div>
+                                                )}
                                             </div>
-                                            {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0 mt-1" />}
-                                        </button>
-                                    );
-                                })}
+                                        );
+                                    })}
+                            </>
+
 
                                 {/* Individual Models List Header */}
                                 {flatModels.length > 0 && (

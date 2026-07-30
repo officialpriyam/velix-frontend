@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import PlanDrawer from './PlanDrawer';
+import '../styles/planMode.css';
 import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square, Globe, Brain, Eye } from 'lucide-react';
 import { aiApi, copyToClipboard } from '../lib/api';
 import { useNotification } from './Notification';
@@ -99,6 +101,9 @@ export const ChatPanel = ({
     const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: string; content: string; size: number }[]>([]);
     const [enableWebSearch, setEnableWebSearch] = useState(false);
     const [chatMode, setChatMode] = useState(false);
+  // Plan mode state
+  const [showPlanDrawer, setShowPlanDrawer] = useState(false);
+  const [planPrompt, setPlanPrompt] = useState('');
     const [execMode, setExecMode] = useState<'build' | 'plan' | 'chat'>('build');
     const [showExecModeDropdown, setShowExecModeDropdown] = useState(false);
 
@@ -427,6 +432,8 @@ export const ChatPanel = ({
                     setPlanningData(planRes);
                     setActiveQuestionIndex(0);
                     setPlanApproved(false);
+                    setPlanPrompt(finalPrompt);
+                    setShowPlanDrawer(true);
                     setStatusLog([{ message: 'Plan & questions generated', type: 'done' }]);
                 }
             } catch (planErr: any) {
@@ -862,42 +869,19 @@ export const ChatPanel = ({
                     </div>
                 )}
 
-                {messages.map((msg, i) => {
-                    const isLast = i === messages.length - 1;
-                    const showFileChips = isLast && msg.role === 'assistant' && generatedFiles.created.length + generatedFiles.edited.length > 0;
-                    return (
-                    <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-in fade-in duration-200`}>
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${msg.role === 'user' ? 'neu-raised' : 'bg-primary/10 border border-primary/20'}`}>
-                            {msg.role === 'user' ? <User className="w-3.5 h-3.5 text-muted" /> : <Bot className="w-3.5 h-3.5 text-primary" />}
-                        </div>
-                        <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed ${msg.role === 'user'
-                            ? 'neu-raised text-foreground'
-                            : 'text-foreground/90'
-                            }`}>
-                            {msg.role === 'user' ? (
-                                <>
-                                    <p className="font-medium">{msg.content}</p>
-                                    {msg.attachments && msg.attachments.length > 0 && (
-                                        <div className="flex flex-wrap gap-1.5 mt-2">
-                                            {msg.attachments.map((att, ai) => (
-                                                <div key={ai} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] text-muted">
-                                                    {att.type.startsWith('image/') ? <Image className="w-2.5 h-2.5" /> : <FileCode className="w-2.5 h-2.5" />}
-                                                    <span>{att.name}</span>
-                                                    <span className="text-foreground/30">{formatFileSize(att.size)}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <AssistantMessageContent content={msg.content} />
-                            )}
-                            {showFileChips && (
-                                <FileChipsSummary created={generatedFiles.created} edited={generatedFiles.edited} />
-                            )}
-                        </div>
-                    </div>
-                    );
+{messages.map((msg, i) => {
+    const isLast = i === messages.length - 1;
+    const showFileChips = isLast && msg.role === 'assistant' && generatedFiles.created.length + generatedFiles.edited.length > 0;
+    return (
+        <React.Fragment key={i}>
+            <ChatMessage role={msg.role} content={msg.content} attachments={msg.attachments} />
+            {showFileChips && (
+                <FileChipsSummary created={generatedFiles.created} edited={generatedFiles.edited} />
+            )}
+        </React.Fragment>
+    );
+})}
+
                 })}
 
                 {compiling && !buildResult && (
