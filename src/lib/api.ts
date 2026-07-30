@@ -122,12 +122,12 @@ export const aiApi = {
         });
         return safeJson(res);
     },
-    getPlan: async (prompt: string, sessionId: string, platform?: string, language?: string, model?: string, signal?: AbortSignal) => {
+    getPlan: async (prompt: string, sessionId: string, platform?: string, language?: string, model?: string, signal?: AbortSignal, enableWebSearch?: boolean) => {
         const res = await fetch(`${BASE_URL}/ai/plan`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ prompt, sessionId, platform, language, model }),
+            body: JSON.stringify({ prompt, sessionId, platform, language, model, enableWebSearch }),
             signal
         });
         return safeJson(res);

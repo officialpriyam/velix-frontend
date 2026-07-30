@@ -454,13 +454,15 @@ export const ChatPanel = ({
             setStatusLog([{ message: 'Analyzing request parameters & goals...', type: 'pending' }]);
             try {
                 if (!sessionId) throw new Error('Create or open a project before planning.');
-                const planRes = await aiApi.getPlan(finalPrompt, sessionId, platform, language, model, controller.signal);
+                const planRes = await aiApi.getPlan(finalPrompt, sessionId, platform, language, model, controller.signal, enableWebSearch);
+                if (planRes?.error) throw new Error(planRes.error);
                 if (planRes) {
                     setPlanningData(planRes);
                     setActiveQuestionIndex(0);
                     setPlanApproved(false);
                     setPlanPrompt(finalPrompt);
                     setStatusLog([{ message: 'Plan & clarifying questions generated', type: 'done' }]);
+                    if (planRes.searchQueries?.length) setSearchStatus({ queries: planRes.searchQueries, sources: planRes.searchSources || [] });
 
                     const savedMessage = planRes.message ? {
                         ...planRes.message,
@@ -474,7 +476,6 @@ export const ChatPanel = ({
                 console.error('Plan failed:', planErr);
                 setStatusLog([{ message: planErr?.message || 'Unable to create a plan. Please try again.', type: 'error' }]);
                 showNotification(planErr?.message || 'Unable to create a plan.', 'error');
-                return;
                 return;
             } finally {
                 setLoading(false);

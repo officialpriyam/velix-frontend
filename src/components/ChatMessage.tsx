@@ -41,10 +41,10 @@ export function ChatMessage({ id, role, content, created_at, messageType = 'mess
 
   return <div className="my-3 flex gap-3 animate-in fade-in duration-200">
     <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-indigo-400/30 bg-indigo-500/10"><Bot className="h-4 w-4 text-indigo-300" /></div>
-    <div className="min-w-0 max-w-[90%] space-y-3">
-      <div className="rounded-2xl border border-white/10 bg-[#1d1d21] p-4 text-xs leading-relaxed text-zinc-300 shadow-xl">
+    <div className="min-w-0 max-w-[90%] space-y-3 pt-1">
+      <div className="text-xs leading-relaxed text-zinc-300">
         {messageType === 'build' && <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-300"><Check className="h-3.5 w-3.5" /> Build complete</div>}
-        {messageType === 'plan' && <button onClick={() => id && onOpenPlan?.(id)} className="mb-2 flex w-full items-center gap-2 rounded-xl border border-indigo-400/20 bg-indigo-500/5 p-2.5 text-left hover:bg-indigo-500/10"><FileText className="h-4 w-4 text-indigo-300" /><span><b className="text-zinc-100">Plan: </b>{metadata.plan?.title || 'Project plan'}</span></button>}
+        {messageType === 'plan' && <button onClick={() => id && onOpenPlan?.(id)} className="mb-2 flex items-center gap-2 text-left text-indigo-300 hover:text-indigo-200"><FileText className="h-4 w-4" /><span><b>Open plan.md</b> — {metadata.plan?.title || 'Project plan'}</span></button>}
         <p className="whitespace-pre-wrap">{content}</p>
         {metadata.files?.length ? <div className="mt-3 flex flex-wrap gap-1">{metadata.files.slice(0, 8).map((f, i) => <span key={i} className="flex items-center gap-1 rounded-md bg-white/5 px-1.5 py-1 text-[10px] text-zinc-400"><FileCode className="h-3 w-3" />{f.path}</span>)}</div> : null}
       </div>
