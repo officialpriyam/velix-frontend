@@ -30,8 +30,37 @@ async function safeJson(res: Response) {
     try { return JSON.parse(text); } catch { return { error: text.substring(0, 300) || 'Unknown error' }; }
 }
 
+function filenameFromDisposition(disposition: string | null, fallback: string): string {
+    if (!disposition) return fallback;
+    const utf = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf) { try { return decodeURIComponent(utf[1]); } catch {} }
+    const plain = disposition.match(/filename="?([^";]+)"?/i);
+    if (plain) return plain[1];
+    return fallback;
+}
+
+export async function downloadBlob(url: string, fallbackName: string): Promise<void> {
+    try {
+        const res = await fetch(url, { credentials: 'include' });
+        if (!res.ok) throw new Error(`Download failed (${res.status})`);
+        const blob = await res.blob();
+        const name = filenameFromDisposition(res.headers.get('Content-Disposition'), fallbackName);
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+    } catch (err: any) {
+        console.error('Blob download failed:', err.message);
+        throw err;
+    }
+}
+
 export const aiApi = {
-    generate: async (prompt: string, language: string, model?: string, sessionId?: string, platform?: string, signal?: AbortSignal, enableWebSearch?: boolean, images?: Array<{ data: string; mimeType: string }>, fileContext?: Array<{ path: string; content: string }>, chatMode?: boolean, fromPlan?: boolean, planMessageId?: number, onProgress?: (event: { event?: string; type?: string; query?: string; title?: string; url?: string; path?: string; op?: string; model?: string }) => void) => {
+    generate: async (prompt: string, language: string, model?: string, sessionId?: string, platform?: string, signal?: AbortSignal, enableWebSearch?: boolean, images?: Array<{ data: string; mimeType: string }>, fileContext?: Array<{ path: string; content: string }>, chatMode?: boolean, fromPlan?: boolean, planMessageId?: number, onProgress?: (event: { event?: string; type?: string; query?: string; title?: string; url?: string; path?: string; op?: string; model?: string; docs?: string[]; command?: string; status?: string; output?: string; success?: boolean }) => void) => {
         const body = JSON.stringify({ prompt, language, model, sessionId, platform, enableWebSearch, images, fileContext, chatMode, fromPlan, planMessageId });
         if (onProgress) {
             const res = await fetch(`${BASE_URL}/ai/generate?stream=true`, {
@@ -281,10 +310,11 @@ export const fileApi = {
         return safeJson(res);
     },
     download: (sessionId: string, path: string) => {
-        window.location.href = `${BASE_URL}/files/download/file?sessionId=${sessionId}&path=${encodeURIComponent(path)}`;
+        const name = path.split('/').pop() || 'file.txt';
+        downloadBlob(`${BASE_URL}/files/download/file?sessionId=${sessionId}&path=${encodeURIComponent(path)}`, name).catch(() => {});
     },
     downloadAll: (sessionId: string) => {
-        window.location.href = `${BASE_URL}/files/download/all?sessionId=${sessionId}`;
+        downloadBlob(`${BASE_URL}/files/download/all?sessionId=${sessionId}`, `project-${sessionId}.zip`).catch(() => {});
     }
 };
 
@@ -303,7 +333,7 @@ export const compilerApi = {
         return safeJson(res);
     },
     downloadArtifact: (historyId: number) => {
-        window.location.href = `${BASE_URL}/compiler/artifact/${historyId}`;
+        downloadBlob(`${BASE_URL}/compiler/artifact/${historyId}`, `artifact-${historyId}.jar`).catch(() => {});
     },
     getJavaVersions: async () => {
         try {
@@ -482,7 +512,7 @@ export const dependenciesApi = {
         return safeJson(res);
     },
     download: (sessionId: string, depId: number) => {
-        window.location.href = `${BASE_URL}/dependencies/${sessionId}/${depId}/download`;
+        downloadBlob(`${BASE_URL}/dependencies/${sessionId}/${depId}/download`, `dependency-${depId}.jar`).catch(() => {});
     },
     toggleShade: async (sessionId: string, depId: number, isShaded: boolean) => {
         const res = await fetch(`${BASE_URL}/dependencies/${sessionId}/${depId}/shade`, {

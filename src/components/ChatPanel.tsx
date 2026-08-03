@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ModelSelector } from './ModelSelector';
-import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square, Globe, Brain, Eye, ChevronDown } from 'lucide-react';
+import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square, Globe, Brain, Eye, ChevronDown, TerminalSquare } from 'lucide-react';
 import { aiApi, copyToClipboard } from '../lib/api';
 import { useNotification } from './Notification';
 import { useRouter } from 'next/navigation';
@@ -98,13 +98,12 @@ function parseMetadata(metadata: any) {
     return metadata;
 }
 
-function AgentActivityTimeline({ logs, loading, created, edited, search, docs }: { logs: { message: string; type: 'pending' | 'done' | 'error' }[]; loading: boolean; created: string[]; edited: string[]; search: { queries: string[]; sources: { title: string; url: string }[] } | null; docs: string[] }) {
+function AgentActivityTimeline({ logs, loading }: { logs: { message: string; type: 'pending' | 'done' | 'error' }[]; loading: boolean }) {
     const [expanded, setExpanded] = useState(true);
-    const totalTools = created.length + edited.length + (search?.queries.length || 0) + docs.length;
-    if (!logs.length && !search && totalTools === 0) return null;
+    if (!logs.length) return null;
     return <section className="mx-5 mb-3 overflow-hidden rounded-lg border border-white/[.09] bg-[#10151b] shadow-[0_12px_32px_rgba(0,0,0,.16)]">
-        <button type="button" onClick={() => setExpanded(!expanded)} className="flex w-full items-center justify-between border-b border-white/[.06] px-3 py-2 text-left hover:bg-white/[.02]"><span className="flex items-center gap-2"><Brain className={`h-3.5 w-3.5 ${loading ? 'animate-pulse text-violet-300' : 'text-sky-300'}`} /><span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">AI reasoning</span><span className="text-[10px] text-zinc-500">{loading ? 'Thinking…' : 'Complete'}</span></span><span className="flex items-center gap-2 text-[10px] text-zinc-500">{totalTools > 0 && `${totalTools} tool${totalTools === 1 ? '' : 's'}`}<ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? '' : '-rotate-90'}`} /></span></button>
-        {expanded && <div className="divide-y divide-white/[.055]">{logs.map((log, i) => <div key={`${log.message}-${i}`} className="flex items-center gap-2 px-3 py-2 text-[11px]">{log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}<span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}>{log.message}</span></div>)}{search?.queries.map((query, i) => <div key={`search-${i}`} className="px-3 py-2"><div className="flex items-center gap-2 text-[11px] text-zinc-300"><Globe className="h-3.5 w-3.5 text-sky-400" />Searched the web for <span className="truncate text-sky-300">{query}</span></div>{i === 0 && search.sources.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{search.sources.slice(0, 4).map((source, sourceIndex) => <a key={sourceIndex} href={source.url} target="_blank" rel="noreferrer" className="max-w-[180px] truncate rounded border border-sky-400/15 bg-sky-400/[.06] px-1.5 py-1 text-[9px] text-sky-200 hover:bg-sky-400/10">{source.title}</a>)}</div>}</div>)}{docs.length > 0 && <div className="px-3 py-2"><div className="flex items-center gap-2 text-[11px] text-zinc-300"><FileText className="h-3.5 w-3.5 text-amber-400" />Read docs</div><div className="mt-2 flex flex-wrap gap-1">{docs.map((doc, i) => <span key={i} className="max-w-[200px] truncate rounded border border-amber-400/15 bg-amber-400/[.06] px-1.5 py-1 text-[9px] text-amber-200">{doc}</span>)}</div></div>}{(created.length > 0 || edited.length > 0) && <div className="px-3 py-2"><div className="mb-1.5 text-[9px] font-semibold uppercase tracking-[.12em] text-zinc-500">Files changed</div><div className="flex flex-wrap gap-1">{[...created.map(path => ['Created', path]), ...edited.map(path => ['Edited', path])].slice(0, 10).map(([action, path], i) => <span key={i} className="flex max-w-[200px] items-center gap-1 rounded border border-white/[.06] bg-white/[.025] px-1.5 py-1 text-[9px] text-zinc-400"><FileCode className="h-3 w-3 text-sky-300" />{action}: {String(path).split('/').pop()}</span>)}</div></div>}</div>}
+        <button type="button" onClick={() => setExpanded(!expanded)} className="flex w-full items-center justify-between border-b border-white/[.06] px-3 py-2 text-left hover:bg-white/[.02]"><span className="flex items-center gap-2"><Brain className={`h-3.5 w-3.5 ${loading ? 'animate-pulse text-violet-300' : 'text-sky-300'}`} /><span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">AI reasoning</span><span className="text-[10px] text-zinc-500">{loading ? 'Thinking…' : 'Complete'}</span></span><span className="flex items-center gap-2 text-[10px] text-zinc-500"><ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? '' : '-rotate-90'}`} /></span></button>
+        {expanded && <div className="divide-y divide-white/[.055]">{logs.map((log, i) => <div key={`${log.message}-${i}`} className="flex items-center gap-2 px-3 py-2 text-[11px]">{log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}<span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}>{log.message}</span></div>)}</div>}
     </section>;
 }
 
@@ -156,11 +155,27 @@ export const ChatPanel = ({
 
     const [searchStatus, setSearchStatus] = useState<{ queries: string[]; sources: { title: string; url: string }[] } | null>(null);
     const [docsStatus, setDocsStatus] = useState<string[]>([]);
+    const [commandStatus, setCommandStatus] = useState<{ command: string; status: string; output?: string }[]>([]);
+    const [downloadStatus, setDownloadStatus] = useState<{ url: string; path: string; success: boolean }[]>([]);
     const abortControllerRef = useRef<AbortController | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const [scrolledDown, setScrolledDown] = useState(false);
+    const [reasoningPopupOpen, setReasoningPopupOpen] = useState(false);
     const autoSubmittedPromptRef = useRef<string | null>(null);
     const { user } = useAuth();
+
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const onScroll = () => {
+            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+            setScrolledDown(!atBottom);
+        };
+        el.addEventListener('scroll', onScroll, { passive: true });
+        return () => el.removeEventListener('scroll', onScroll);
+    }, []);
 
     const statusLogKey = sessionId ? `velix_status_log_${sessionId}` : '';
     const generatedFilesKey = sessionId ? `velix_generated_files_${sessionId}` : '';
@@ -466,6 +481,8 @@ export const ChatPanel = ({
         setGeneratedFiles({ created: [], edited: [] });
         setSearchStatus(null);
         setDocsStatus([]);
+        setCommandStatus([]);
+        setDownloadStatus([]);
 
         // Create abort controller for this request
         const controller = new AbortController();
@@ -547,6 +564,8 @@ export const ChatPanel = ({
         setGeneratedFiles({ created: [], edited: [] });
         setSearchStatus(null);
         setDocsStatus([]);
+        setCommandStatus([]);
+        setDownloadStatus([]);
 
         if (typeof window !== 'undefined' && window.location.search) {
             const cleanUrl = window.location.pathname;
@@ -718,6 +737,30 @@ export const ChatPanel = ({
                     });
                     logs.push({ message: `${isNew ? '+' : '~'} ${isNew ? 'Created' : 'Edited'} ${ev.path}`, type: 'done' });
                     setStatusLog([...logs]);
+                } else if (ev.event === 'command') {
+                    if (ev.status === 'running') {
+                        logs.push({ message: `Running command: ${ev.command}`, type: 'pending' });
+                    } else {
+                        setCommandStatus(prev => {
+                            const existing = prev.findIndex(c => c.command === ev.command);
+                            const entry = { command: ev.command, status: ev.status === 'done' ? 'done' : 'error', output: ev.output };
+                            if (existing >= 0) {
+                                const copy = [...prev];
+                                copy[existing] = entry;
+                                return copy;
+                            }
+                            return [...prev, entry];
+                        });
+                        logs.push({ message: `Command ${ev.status === 'done' ? 'completed' : 'failed'}: ${ev.command}`, type: ev.status === 'done' ? 'done' : 'error' });
+                    }
+                    setStatusLog([...logs]);
+                } else if (ev.event === 'download') {
+                    setDownloadStatus(prev => {
+                        if (prev.some(d => d.url === ev.url)) return prev;
+                        return [...prev, { url: ev.url, path: ev.path || '', success: ev.success !== false }];
+                    });
+                    logs.push({ message: `Downloaded ${ev.success !== false ? '' : '(failed) '}${ev.path || ev.url}`, type: ev.success !== false ? 'done' : 'error' });
+                    setStatusLog([...logs]);
                 }
             };
 
@@ -838,7 +881,16 @@ export const ChatPanel = ({
 
             setMessages(prev => [
                 ...prev,
-                { role: 'assistant', content: summaryText, files: result.files, message_type: 'build', metadata: { files: result.files.map((file: any) => ({ path: file.path, size: file.content?.length || 0 })), status: 'completed' } }
+                { role: 'assistant', content: summaryText, files: result.files, message_type: 'build', metadata: {
+                    files: result.files.map((file: any) => ({ path: file.path, size: file.content?.length || 0 })),
+                    created,
+                    edited,
+                    search: searchStatus || undefined,
+                    docs: docsStatus.length > 0 ? docsStatus : undefined,
+                    commands: commandStatus.length > 0 ? commandStatus : undefined,
+                    downloads: downloadStatus.length > 0 ? downloadStatus : undefined,
+                    status: 'completed'
+                } }
             ]);
 
             await new Promise(r => setTimeout(r, 400));
@@ -1009,7 +1061,7 @@ export const ChatPanel = ({
             <div className="flex items-center justify-end gap-2 px-3 py-2 border-b border-white/5">
                 <button onClick={async () => { if (sessionId && window.confirm('Clear this project conversation? This cannot be undone.')) { const result = await aiApi.clearMessages(sessionId); if (!result.error) { setMessages([]); setPlanningData(null); } } }} className="rounded-lg px-2 py-1 text-[10px] text-zinc-500 hover:text-red-300">Clear</button>
             </div>
-            <div className="flex-1 overflow-y-auto mb-2 space-y-2">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto mb-2 space-y-2">
                 {messages.length === 0 && statusLog.length === 0 && !buildResult && (
                     <div className="flex flex-col items-center justify-center h-full text-center px-4">
                         <Sparkles className="w-5 h-5 text-muted mb-2" />
@@ -1018,7 +1070,12 @@ export const ChatPanel = ({
                     </div>
                 )}
 
-                <AgentActivityTimeline logs={statusLog} loading={loading} created={generatedFiles.created} edited={generatedFiles.edited} search={searchStatus} docs={docsStatus} />
+                {loading && statusLog.length > 0 && (
+                    <div className="sticky top-0 z-10 px-5 pt-2 -mt-2 bg-[#0c1117]/90 backdrop-blur">
+                        <AgentActivityTimeline logs={statusLog} loading />
+                    </div>
+                )}
+                {!loading && <AgentActivityTimeline logs={statusLog} loading={false} />}
                 {/* Legacy source pills are retained only for backwards-compatible DOM styling. */}
                 {false && (searchStatus?.queries.length || 0) > 0 && (
                     <div className="mx-2 mb-2 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 animate-in fade-in duration-200">
@@ -1182,6 +1239,28 @@ export const ChatPanel = ({
 
                 <div ref={messagesEndRef} />
             </div>
+
+            {scrolledDown && statusLog.length > 0 && (
+                <button type="button" onClick={() => setReasoningPopupOpen(true)} className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-violet-400/30 bg-[#10151b]/95 px-3 py-1.5 text-[11px] text-violet-200 shadow-[0_8px_24px_rgba(0,0,0,.4)] backdrop-blur transition-colors hover:border-violet-400/60">
+                    {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-300" /> : <Brain className="h-3.5 w-3.5 text-violet-300" />}
+                    <span>{loading ? 'AI working…' : 'AI reasoning'}</span>
+                    <span className="text-[10px] text-zinc-500">{statusLog.length} step{statusLog.length === 1 ? '' : 's'}</span>
+                    <ChevronDown className="h-3 w-3 rotate-180 text-zinc-500" />
+                </button>
+            )}
+
+            {reasoningPopupOpen && statusLog.length > 0 && (
+                <div className="absolute inset-0 z-30 flex items-center justify-center p-6" onClick={() => setReasoningPopupOpen(false)}>
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                    <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-[#10151b] shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between border-b border-white/[.06] px-4 py-2.5">
+                            <span className="flex items-center gap-2"><Brain className={`h-4 w-4 ${loading ? 'animate-pulse text-violet-300' : 'text-sky-300'}`} /><span className="text-[11px] font-semibold uppercase tracking-[.12em] text-zinc-200">AI reasoning</span><span className="text-[10px] text-zinc-500">{loading ? 'Working…' : 'Complete'}</span></span>
+                            <button type="button" onClick={() => setReasoningPopupOpen(false)} className="rounded p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-200"><X className="h-4 w-4" /></button>
+                        </div>
+                        <div className="max-h-[60vh] divide-y divide-white/[.055] overflow-y-auto">{statusLog.map((log, i) => <div key={`pop-${log.message}-${i}`} className="flex items-center gap-2 px-4 py-2 text-[11px]">{log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}<span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}>{log.message}</span></div>)}</div>
+                    </div>
+                </div>
+            )}
 
             <div className="mt-auto px-1 pb-1">
                 <div className={`relative rounded-2xl transition-all duration-500 ${loading ? 'p-[1px]' : ''}`} onDragOver={handleDragOver} onDrop={handleDrop}>

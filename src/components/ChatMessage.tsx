@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Bot, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, FileCode, FileText, Loader2, Sparkles } from 'lucide-react';
+import { Bot, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, FileCode, FileText, Globe, Loader2, Sparkles, TerminalSquare, Download, AlertCircle } from 'lucide-react';
 
 export interface QuestionItem { id: string; question: string; options: string[]; }
 export interface PlanData { title: string; summary: string; components?: { name: string; desc: string }[]; designDirection?: string[]; }
-export interface ChatMetadata { plan?: PlanData; questions?: QuestionItem[]; answers?: Record<string, string>; status?: string; files?: { path: string; size?: number }[]; event?: string; }
+export interface ChatMetadata { plan?: PlanData; questions?: QuestionItem[]; answers?: Record<string, string>; status?: string; files?: { path: string; size?: number }[]; created?: string[]; edited?: string[]; search?: { queries: string[]; sources: { title: string; url: string }[] }; docs?: string[]; commands?: { command: string; status: string; output?: string }[]; downloads?: { url: string; path: string; success: boolean }[]; event?: string; }
 
 interface Props {
   id?: number; role: 'user' | 'assistant'; content: string; created_at?: string; messageType?: string;
@@ -20,6 +20,62 @@ function TruncatedContent({ text, className }: { text: string; className?: strin
   return <div>
     <p className={`whitespace-pre-wrap text-[12px] leading-5 ${className || 'text-zinc-300'}`}>{display}</p>
     {isLong && <button onClick={() => setExpanded(!expanded)} className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-sky-300 transition-colors">{expanded ? <><ChevronUp className="h-3.5 w-3.5" />Show less</> : <><ChevronDown className="h-3.5 w-3.5" />Show more</>}</button>}
+  </div>;
+}
+
+const boxBase = 'mt-3 overflow-hidden rounded-lg border border-white/[.09] bg-[#10151b]';
+const boxHeader = 'flex items-center gap-2 border-b border-white/[.06] px-3 py-2';
+const boxTitle = 'text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300';
+
+function FilesChangedBox({ files, created, edited }: { files?: { path: string; size?: number }[]; created?: string[]; edited?: string[] }) {
+  const createdPaths = created && created.length > 0 ? created : (files || []).map(f => f.path);
+  const editedPaths = edited || [];
+  const list = (paths: string[], color: string, prefix: string) => paths.length > 0 && <div className="flex flex-wrap gap-1">{paths.slice(0, 20).map((p, i) => <span key={i} className="flex max-w-[220px] items-center gap-1 rounded border border-white/[.06] bg-white/[.025] px-1.5 py-1 text-[10px] text-zinc-400"><FileCode className="h-3 w-3 shrink-0" /><span className={`truncate ${color}`}>{p}</span></span>)}</div>;
+  if (!files?.length && !createdPaths.length && !editedPaths.length) return null;
+  return <div className={boxBase}>
+    <div className={boxHeader}><FileCode className="h-3.5 w-3.5 text-emerald-400" /><span className={boxTitle}>Files changed</span><span className="text-[10px] text-zinc-500">{(createdPaths.length + editedPaths.length)} file{(createdPaths.length + editedPaths.length) === 1 ? '' : 's'}</span></div>
+    <div className="space-y-2 px-3 py-2">
+      {createdPaths.length > 0 && <div><div className="mb-1 text-[9px] font-semibold uppercase tracking-[.12em] text-emerald-500/70">Created</div>{list(createdPaths, 'text-emerald-300', '+')}</div>}
+      {editedPaths.length > 0 && <div><div className="mb-1 text-[9px] font-semibold uppercase tracking-[.12em] text-amber-500/70">Edited</div>{list(editedPaths, 'text-amber-300', '~')}</div>}
+    </div>
+  </div>;
+}
+
+function SearchBox({ search }: { search?: { queries: string[]; sources: { title: string; url: string }[] } }) {
+  if (!search?.queries?.length) return null;
+  return <div className={boxBase}>
+    <div className={boxHeader}><Globe className="h-3.5 w-3.5 text-sky-400" /><span className={boxTitle}>Web search</span></div>
+    <div className="space-y-1.5 px-3 py-2">
+      {search.queries.map((q, i) => <div key={i} className="text-[11px] text-zinc-300">Searched the web for <span className="text-sky-300">{q}</span></div>)}
+      {search.sources?.length > 0 && <div className="flex flex-wrap gap-1">{search.sources.slice(0, 5).map((s, i) => <a key={i} href={s.url} target="_blank" rel="noreferrer" className="max-w-[200px] truncate rounded border border-sky-400/15 bg-sky-400/[.06] px-1.5 py-1 text-[9px] text-sky-200 hover:bg-sky-400/10">{s.title}</a>)}</div>}
+    </div>
+  </div>;
+}
+
+function DocsBox({ docs }: { docs?: string[] }) {
+  if (!docs?.length) return null;
+  return <div className={boxBase}>
+    <div className={boxHeader}><FileText className="h-3.5 w-3.5 text-amber-400" /><span className={boxTitle}>Read docs</span></div>
+    <div className="flex flex-wrap gap-1 px-3 py-2">{docs.slice(0, 20).map((doc, i) => <span key={i} className="max-w-[200px] truncate rounded border border-amber-400/15 bg-amber-400/[.06] px-1.5 py-1 text-[9px] text-amber-200">{doc}</span>)}</div>
+  </div>;
+}
+
+function CommandsBox({ commands }: { commands?: { command: string; status: string; output?: string }[] }) {
+  if (!commands?.length) return null;
+  return <div className={boxBase}>
+    <div className={boxHeader}><TerminalSquare className="h-3.5 w-3.5 text-violet-400" /><span className={boxTitle}>Commands run</span></div>
+    <div className="space-y-1.5 px-3 py-2">{commands.map((cmd, i) => <div key={i} className="rounded border border-white/[.06] bg-black/20 px-2 py-1.5">
+      <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-300">{cmd.status === 'done' ? <Check className="h-3 w-3 shrink-0 text-emerald-400" /> : <AlertCircle className="h-3 w-3 shrink-0 text-red-400" />}{cmd.command}</div>
+      {cmd.output && <pre className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap break-all text-[9px] font-mono text-zinc-500">{cmd.output}</pre>}
+    </div>)}</div>
+  </div>;
+}
+
+function DownloadsBox({ downloads }: { downloads?: { url: string; path: string; success: boolean }[] }) {
+  if (!downloads?.length) return null;
+  return <div className={boxBase}>
+    <div className={boxHeader}><Download className="h-3.5 w-3.5 text-sky-400" /><span className={boxTitle}>Downloads</span></div>
+    <div className="space-y-1.5 px-3 py-2">{downloads.map((dl, i) => <div key={i} className="flex items-center gap-1.5 text-[11px] text-zinc-300">{dl.success ? <Check className="h-3 w-3 shrink-0 text-emerald-400" /> : <AlertCircle className="h-3 w-3 shrink-0 text-red-400" />}<span className="truncate">{dl.path || dl.url}</span></div>)}</div>
   </div>;
 }
 
@@ -47,7 +103,13 @@ export function ChatMessage({ id, role, content, created_at, messageType = 'mess
       {messageType === 'build' && <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold text-emerald-400"><Check className="h-3.5 w-3.5" />Generation complete</div>}
       {messageType === 'plan' && <button onClick={() => id && onOpenPlan?.(id)} className="mb-2 flex items-center gap-1.5 text-left text-[11px] text-sky-300 hover:text-sky-200"><FileText className="h-3.5 w-3.5" />Open plan.md — {metadata.plan?.title || 'Project plan'}</button>}
       <TruncatedContent text={content} />
-      {metadata.files?.length ? <div className="mt-3 flex flex-wrap gap-1">{metadata.files.slice(0, 8).map((file, i) => <span key={i} className="flex items-center gap-1 rounded border border-white/[.06] bg-white/[.025] px-1.5 py-1 text-[10px] text-zinc-400"><FileCode className="h-3 w-3" />{file.path}</span>)}</div> : null}
+      {messageType === 'build' && <>
+        <FilesChangedBox files={metadata.files} created={metadata.created} edited={metadata.edited} />
+        <SearchBox search={metadata.search} />
+        <DocsBox docs={metadata.docs} />
+        <CommandsBox commands={metadata.commands} />
+        <DownloadsBox downloads={metadata.downloads} />
+      </>}
 
       {messageType === 'plan' && question && status === 'awaiting_answers' && <div className="mt-3 rounded-lg border border-white/10 bg-[#11161d] p-3">
         <p className="mb-2 text-xs font-semibold text-zinc-100">{question.question}</p>

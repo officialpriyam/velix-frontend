@@ -410,9 +410,20 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
         try {
             const result = await compilerApi.run(sessionId, language);
             const isSuccess = result.success === true || result.success === 1;
+            // Build a complete log from the response — prefer the full log, then stages output, then a fallback.
+            let log = result.log || '';
+            if (!log && result.stages && typeof result.stages === 'object') {
+                const parts: string[] = [];
+                Object.entries(result.stages).forEach(([name, stage]: any) => {
+                    if (stage?.stdout) parts.push(`=== ${name} ===\n${stage.stdout}`);
+                    if (stage?.stderr) parts.push(`=== ${name} (stderr) ===\n${stage.stderr}`);
+                });
+                log = parts.join('\n');
+            }
+            if (!log) log = isSuccess ? 'Build completed successfully.' : 'Build failed with errors.';
             setBuildResult({
                 success: isSuccess,
-                log: result.log || (isSuccess ? 'Build completed successfully.' : 'Build failed with errors.'),
+                log,
                 compiler: compiler || selectedCompiler,
                 timestamp: new Date().toISOString(),
                 historyId: result.historyId || undefined
