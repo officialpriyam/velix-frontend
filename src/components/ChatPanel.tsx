@@ -699,10 +699,14 @@ export const ChatPanel = ({
                 } else if (ev.event === 'file') {
                     streamedFiles = true;
                     const isNew = ev.op === 'created';
-                    setGeneratedFiles(prev => ({
-                        created: isNew ? [...prev.created, ev.path] : prev.created,
-                        edited: isNew ? prev.edited : [...prev.edited, ev.path]
-                    }));
+                    setGeneratedFiles(prev => {
+                        const seen = prev.created.includes(ev.path) || prev.edited.includes(ev.path);
+                        if (seen) return prev;
+                        return {
+                            created: isNew ? [...prev.created, ev.path] : prev.created,
+                            edited: isNew ? prev.edited : [...prev.edited, ev.path]
+                        };
+                    });
                     logs.push({ message: `${isNew ? '+' : '~'} ${isNew ? 'Created' : 'Edited'} ${ev.path}`, type: 'done' });
                     setStatusLog([...logs]);
                 }
