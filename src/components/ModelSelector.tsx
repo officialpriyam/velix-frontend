@@ -8,7 +8,7 @@ export interface ModelItem {
     id: string;
     name: string;
     description?: string;
-    provider?: 'openrouter' | 'nvidia';
+    provider?: 'openrouter' | 'nvidia' | 'llmgate' | 'orac' | 'priyx';
 }
 
 export interface ModelTiersData {
@@ -85,10 +85,16 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
         if (id === 'velix-lite' || id === 'priyx-lite' || id === 'lite') return 'Velix Lite';
         if (id === 'velix-pro' || id === 'priyx-ultra' || id === 'velix-ultra' || id === 'pro' || id === 'ultra') return 'Velix Pro';
         if (id === 'velix-max' || id === 'priyx-max' || id === 'max') return 'Velix Max';
+        if (id === 'llmgate') return 'LLMGATE';
+        if (id === 'orac') return 'orac';
+        if (id === 'priyx') return 'Priyx';
         const found = flatModels.find(m => m.id === id);
         if (found) return found.name || found.id;
         return id.split('/').pop()?.replace(/:free/g, '').replace(/-/g, ' ') || id;
     };
+
+    const specialtyModels = (flatModels.length > 0 ? flatModels : (tiersData?.lite?.models || []))
+        .filter((m: any) => ['llmgate', 'orac', 'priyx'].includes(m.provider));
 
     return (
         <div className="relative w-fit" onClick={e => e.stopPropagation()}>
@@ -188,6 +194,42 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
                                 </div>
                             );
                         })}
+
+                        {specialtyModels.length > 0 && (
+                            <>
+                                <div className="px-2 pt-2 pb-1 text-[10px] font-bold text-muted uppercase tracking-wider">
+                                    Specialty Providers
+                                </div>
+                                {specialtyModels.map(m => (
+                                    <button
+                                        key={m.id}
+                                        type="button"
+                                        onClick={() => {
+                                            onSelectModel(m.id);
+                                            setIsOpen(false);
+                                            setExpandedTier(null);
+                                        }}
+                                        className={`w-full text-left p-2.5 rounded-xl text-xs transition-all flex items-start justify-between gap-2 border ${
+                                            selectedModel === m.id ? 'bg-primary/10 border-primary/30 text-foreground font-semibold shadow-sm' : 'border-transparent text-foreground/70 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground'
+                                        }`}
+                                    >
+                                        <div className="flex items-start gap-2.5">
+                                            <div className="p-1.5 rounded-lg shrink-0 mt-0.5 bg-violet-500/15 text-violet-400">
+                                                <Sparkles className="w-3.5 h-3.5" />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="font-bold text-foreground">{m.name || m.id}</span>
+                                                    <span className="px-1.5 py-0.2 text-[9px] font-medium bg-emerald-500/15 text-emerald-400 rounded-full">Free</span>
+                                                </div>
+                                                <div className="text-[10px] text-muted mt-0.5 leading-tight">{m.description}</div>
+                                            </div>
+                                        </div>
+                                        {selectedModel === m.id && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                                    </button>
+                                ))}
+                            </>
+                        )}
                     </div>
                 </div>
             )}

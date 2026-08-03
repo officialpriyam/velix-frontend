@@ -97,6 +97,16 @@ function parseMetadata(metadata: any) {
     return metadata;
 }
 
+function AgentActivityTimeline({ logs, loading, created, edited, search }: { logs: { message: string; type: 'pending' | 'done' | 'error' }[]; loading: boolean; created: string[]; edited: string[]; search: { queries: string[]; sources: { title: string; url: string }[] } | null; }) {
+    const [expanded, setExpanded] = useState(true);
+    const totalTools = created.length + edited.length + (search?.queries.length || 0);
+    if (!logs.length && !search && totalTools === 0) return null;
+    return <section className="mx-5 mb-3 overflow-hidden rounded-lg border border-white/[.09] bg-[#10151b] shadow-[0_12px_32px_rgba(0,0,0,.16)]">
+        <button type="button" onClick={() => setExpanded(!expanded)} className="flex w-full items-center justify-between border-b border-white/[.06] px-3 py-2 text-left hover:bg-white/[.02]"><span className="flex items-center gap-2"><Brain className={`h-3.5 w-3.5 ${loading ? 'animate-pulse text-violet-300' : 'text-sky-300'}`} /><span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">AI reasoning</span><span className="text-[10px] text-zinc-500">{loading ? 'Thinking…' : 'Complete'}</span></span><span className="flex items-center gap-2 text-[10px] text-zinc-500">{totalTools > 0 && `${totalTools} tool${totalTools === 1 ? '' : 's'}`}<ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? '' : '-rotate-90'}`} /></span></button>
+        {expanded && <div className="divide-y divide-white/[.055]">{logs.map((log, i) => <div key={`${log.message}-${i}`} className="flex items-center gap-2 px-3 py-2 text-[11px]">{log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}<span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}>{log.message}</span></div>)}{search?.queries.map((query, i) => <div key={`search-${i}`} className="px-3 py-2"><div className="flex items-center gap-2 text-[11px] text-zinc-300"><Globe className="h-3.5 w-3.5 text-sky-400" />Searched the web for <span className="truncate text-sky-300">{query}</span></div>{i === 0 && search.sources.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{search.sources.slice(0, 4).map((source, sourceIndex) => <a key={sourceIndex} href={source.url} target="_blank" rel="noreferrer" className="max-w-[180px] truncate rounded border border-sky-400/15 bg-sky-400/[.06] px-1.5 py-1 text-[9px] text-sky-200 hover:bg-sky-400/10">{source.title}</a>)}</div>}</div>)}{(created.length > 0 || edited.length > 0) && <div className="px-3 py-2"><div className="mb-1.5 text-[9px] font-semibold uppercase tracking-[.12em] text-zinc-500">Files changed</div><div className="flex flex-wrap gap-1">{[...created.map(path => ['Created', path]), ...edited.map(path => ['Edited', path])].slice(0, 10).map(([action, path], i) => <span key={i} className="flex max-w-[200px] items-center gap-1 rounded border border-white/[.06] bg-white/[.025] px-1.5 py-1 text-[9px] text-zinc-400"><FileCode className="h-3 w-3 text-sky-300" />{action}: {String(path).split('/').pop()}</span>)}</div></div>}</div>}
+    </section>;
+}
+
 export const ChatPanel = ({
     sessionId,
     onCodeGenerated,
@@ -711,7 +721,8 @@ export const ChatPanel = ({
 
         if (effectiveChatMode) {
             // Chat mode: just show conversational response
-            setStatusLog([]);
+            logs[logs.length - 1] = { message: 'Response ready', type: 'done' };
+            setStatusLog([...logs]);
             setMessages(prev => [
                 ...prev,
                 { role: 'assistant', content: result.rawResponse }
@@ -947,24 +958,25 @@ export const ChatPanel = ({
                     </div>
                 )}
 
-                {/* Web search status */}
-                {searchStatus && searchStatus.queries.length > 0 && (
+                <AgentActivityTimeline logs={statusLog} loading={loading} created={generatedFiles.created} edited={generatedFiles.edited} search={searchStatus} />
+                {/* Legacy source pills are retained only for backwards-compatible DOM styling. */}
+                {false && (searchStatus?.queries.length || 0) > 0 && (
                     <div className="mx-2 mb-2 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 animate-in fade-in duration-200">
                         <div className="flex items-center gap-2 mb-2">
                             <Globe className="w-3.5 h-3.5 text-blue-400" />
                             <span className="text-[11px] font-bold text-blue-400">Web Search</span>
                         </div>
                         <div className="space-y-1.5">
-                            {searchStatus.queries.map((q, i) => (
+                            {searchStatus!.queries.map((q, i) => (
                                 <div key={i} className="flex items-center gap-2 text-[10px]">
                                     <span className="text-foreground/40">Searched:</span>
                                     <span className="text-foreground/70 font-medium">"{q}"</span>
                                 </div>
                             ))}
                         </div>
-                        {searchStatus.sources.length > 0 && (
+                        {searchStatus!.sources.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1">
-                                {searchStatus.sources.slice(0, 5).map((s, i) => (
+                                {searchStatus!.sources.slice(0, 5).map((s, i) => (
                                     <a key={i} href={s.url} target="_blank" rel="noopener noreferrer"
                                         className="px-1.5 py-0.5 text-[9px] rounded bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 transition-colors truncate max-w-[150px]"
                                         title={s.title}
@@ -972,8 +984,8 @@ export const ChatPanel = ({
                                         {s.title.slice(0, 30)}{s.title.length > 30 ? '...' : ''}
                                     </a>
                                 ))}
-                                {searchStatus.sources.length > 5 && (
-                                    <span className="px-1.5 py-0.5 text-[9px] text-foreground/30">+{searchStatus.sources.length - 5} more</span>
+                                {searchStatus!.sources.length > 5 && (
+                                    <span className="px-1.5 py-0.5 text-[9px] text-foreground/30">+{searchStatus!.sources.length - 5} more</span>
                                 )}
                             </div>
                         )}
@@ -1075,7 +1087,7 @@ export const ChatPanel = ({
                     </div>
                 )}
 
-                {statusLog.length > 0 && (
+                {false && statusLog.length > 0 && (
                     <div className="px-3 py-2 space-y-1 animate-in fade-in duration-200">
                         <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-1.5">

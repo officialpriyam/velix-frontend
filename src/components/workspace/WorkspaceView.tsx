@@ -1446,6 +1446,33 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                                         </button>
                                     </div>
 
+                                    {/* Specialty Providers */}
+                                    {(modelTiers?.lite?.models || []).filter((m: any) => ['llmgate', 'orac', 'priyx'].includes(m.provider)).length > 0 && (
+                                        <div className="space-y-3 mb-4">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-muted">Specialty Providers</div>
+                                            {(modelTiers?.lite?.models || []).filter((m: any) => ['llmgate', 'orac', 'priyx'].includes(m.provider)).map((m: any) => (
+                                                <button
+                                                    key={m.id}
+                                                    onClick={() => handleModelChange(m.id)}
+                                                    className={`w-full text-left neu-inset rounded-xl p-4 transition-all ${
+                                                        model === m.id ? 'ring-2 ring-primary' : 'hover:ring-1 hover:ring-muted/30'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-6 h-6 rounded-full bg-violet-500/20 flex items-center justify-center">
+                                                                <Sparkles className="w-3 h-3 text-violet-400" />
+                                                            </div>
+                                                            <span className="text-sm font-bold text-foreground">{m.name || m.id}</span>
+                                                        </div>
+                                                        <span className="px-2 py-0.5 text-[9px] font-bold uppercase bg-emerald-500/15 text-emerald-400 rounded">Free</span>
+                                                    </div>
+                                                    <p className="text-[11px] text-muted ml-8">{m.description}</p>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
                                     {/* Model count */}
                                     {modelTiers && (
                                         <p className="text-[10px] text-faint text-center">
