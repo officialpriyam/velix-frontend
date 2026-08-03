@@ -341,10 +341,10 @@ export default function LandingPage() {
     <main className="min-h-screen bg-[#0a0a0f] text-white antialiased">
       {/* ═══════ HERO ═══════ */}
       <section className="relative overflow-hidden pb-16 pt-8">
-        {/* Background video — lighter overlay so campfire is visible */}
+        {/* Background video */}
         <div className="absolute inset-0">
           <video
-            src="/landing/campfire.mp4"
+            src="/landing/snow.mp4"
             autoPlay
             muted
             loop
@@ -352,7 +352,7 @@ export default function LandingPage() {
             preload="metadata"
             className="absolute inset-0 h-full w-full object-cover"
           />
-          {/* Much lighter overlay — campfire clearly visible */}
+          {/* Dark vignette edges only — video visible */}
           <div className="absolute inset-0 bg-[#0a0a0f]/40" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0f] via-transparent to-[#0a0a0f]" />
         </div>
