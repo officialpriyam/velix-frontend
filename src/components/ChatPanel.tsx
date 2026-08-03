@@ -520,7 +520,10 @@ export const ChatPanel = ({
                     plan: normalizedPlan,
                     questions: normalizedQuestions,
                     answers: messageMetadata.answers || {},
-                    status: messageMetadata.status || 'awaiting_answers'
+                    status: messageMetadata.status || 'awaiting_answers',
+                    search: planRes?.searchQueries?.length
+                        ? { queries: planRes.searchQueries, sources: planRes.searchSources || [] }
+                        : undefined
                 };
                 if (planRes) {
                     setPlanningData({ plan: normalizedPlan, questions: normalizedQuestions });
@@ -823,7 +826,15 @@ export const ChatPanel = ({
             setStatusLog([...logs]);
             setMessages(prev => [
                 ...prev,
-                { role: 'assistant', content: result.rawResponse }
+                {
+                    role: 'assistant',
+                    content: result.rawResponse,
+                    metadata: {
+                        search: result.searchQueries?.length
+                            ? { queries: result.searchQueries, sources: result.searchSources || [] }
+                            : undefined
+                    }
+                }
             ]);
         } else if (result.files && result.files.length > 0) {
             const created: string[] = [];

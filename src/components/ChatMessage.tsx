@@ -112,6 +112,7 @@ export function ChatMessage({ id, role, content, created_at, messageType = 'mess
         <CommandsBox commands={metadata.commands} />
         <DownloadsBox downloads={metadata.downloads} />
       </>}
+      {messageType !== 'build' && <SearchBox search={metadata.search} />}
 
       {messageType === 'plan' && question && status === 'awaiting_answers' && <div className="mt-3 rounded-lg border border-white/10 bg-[#11161d] p-3">
         <p className="mb-2 text-xs font-semibold text-zinc-100">{question.question}</p>
