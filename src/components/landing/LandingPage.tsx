@@ -777,7 +777,7 @@ export default function LandingPage() {
             <a href="/terms" className="hover:text-white/60">Terms of Service</a>
             <a href="/privacy" className="hover:text-white/60">Privacy Policy</a>
           </div>
-          <p className="text-[12px] text-white/30">&copy; 2026 Folia AI. Not affiliated with Mojang or Microsoft.</p>
+          <p className="text-[12px] text-white/30">&copy; 2026 Velix AI. Not affiliated with Mojang or Microsoft.</p>
         </div>
       </footer>
     </main>
