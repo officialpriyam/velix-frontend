@@ -102,14 +102,6 @@ const USE_CASES: Record<string, { title: string; desc: string; features: string[
   },
 };
 
-const PRICING = [
-  { name: "Daily Rewards", price: "Free", priceNum: 0, credits: "100 +daily", desc: "per day forever", features: ["100 credit welcome bonus", "6-12 daily credits", "Streak bonuses (Day 30: 500 credits)", "All AI models included", "Community support", "Online IDE access"], cta: "Claim", popular: false },
-  { name: "Nebula", price: "$9.99", priceNum: 9.99, credits: "600", desc: "credits", features: ["All AI models included", "Community support", "200MB import limit", "Online IDE access", "5% referral commission"], cta: "Get Started", popular: false },
-  { name: "Stellar", price: "$19.99", priceNum: 19.99, credits: "1,500", desc: "credits", features: ["Everything in Nebula", "Priority support", "750MB import limit", "JAR decompilation", "7% referral commission"], cta: "Get Started", popular: true },
-  { name: "Galactic", price: "$44.99", priceNum: 44.99, credits: "3,750", desc: "credits", features: ["Everything in Stellar", "1.5MB import limit", "10% referral commission"], cta: "Get Started", popular: false },
-  { name: "Cosmic", price: "$99.99", priceNum: 99.99, credits: "8,000", desc: "credits", features: ["Everything in Galactic", "2GB import limit", "15% referral commission", "Priority feature requests", "Early access features"], cta: "Get Started", popular: false },
-];
-
 const TESTIMONIALS = [
   { name: "Alex M.", role: "Plugin Developer", text: "Built a full economy plugin in 10 minutes. Usually takes me a whole weekend. The AI understood exactly what I needed.", stars: 5 },
   { name: "Sarah K.", role: "Mod Creator", text: "The Fabric mod support is incredible. Generated a custom inventory mod that works perfectly on 1.21.", stars: 5 },
@@ -133,13 +125,29 @@ const HOW_IT_WORKS = [
   { step: 4, icon: Rocket, title: "Download & Deploy", desc: "Download the JAR file and drop it on your server. Or share it with the community instantly.", color: "text-emerald-400", bg: "bg-emerald-400/10" },
 ];
 
-const PLATFORMS = [
-  { name: "Paper", icon: "P", color: "bg-amber-400/15 text-amber-400" },
-  { name: "Spigot", icon: "S", color: "bg-red-400/15 text-red-400" },
-  { name: "Fabric", icon: "F", color: "bg-sky-400/15 text-sky-400" },
-  { name: "Forge", icon: "Fo", color: "bg-orange-400/15 text-orange-400" },
-  { name: "BungeeCord", icon: "B", color: "bg-emerald-400/15 text-emerald-400" },
-  { name: "Velocity", icon: "V", color: "bg-purple-400/15 text-purple-400" },
+const PLATFORMS: { name: string; img: string | null; letter?: string; color?: string }[] = [
+  { name: "Minecraft Java", img: "/platforms/minecraft.svg" },
+  { name: "Hytale", img: "/platforms/hytale.png" },
+  { name: "Discord", img: "/platforms/discord.png" },
+  { name: "Chrome Extensions", img: "/platforms/chrome.png" },
+  { name: "Plugins", img: "/platforms/papermc.png" },
+  { name: "Spigot", img: "/platforms/spigot.png" },
+  { name: "Paper", img: "/platforms/papermc.png" },
+  { name: "Purpur", img: "/platforms/purpur.svg" },
+  { name: "Velocity", img: "/platforms/velocity.svg" },
+  { name: "Fabric Mods", img: "/platforms/fabric.png" },
+  { name: "Forge Mods", img: "/platforms/java.png" },
+  { name: "Java", img: "/platforms/java.png" },
+  { name: "Kotlin", img: "/platforms/kotlin.png" },
+  { name: "Python", img: "/platforms/python.png" },
+  { name: "JavaScript", img: "/platforms/javascript.png" },
+  { name: "TypeScript", img: "/platforms/typescript.png" },
+  { name: "Ruby", img: "/platforms/ruby.png" },
+  { name: "Configuration", img: null, letter: "C", color: "bg-amber-400/15 text-amber-400" },
+  { name: "Scripting", img: null, letter: "S", color: "bg-violet-400/15 text-violet-400" },
+  { name: "Data Packs", img: null, letter: "D", color: "bg-emerald-400/15 text-emerald-400" },
+  { name: "Bots", img: "/platforms/discord.png" },
+  { name: "Extension", img: "/platforms/chrome.png" },
 ];
 
 /* ────────── hooks ────────── */
@@ -289,11 +297,7 @@ function StatBlock({ s, live }: { s: typeof STATS[number]; live: Record<string, 
   const val = live[s.key];
   const animatedVal = useCountUp(val || 0, 2000, val !== undefined);
   const { ref, visible } = useScrollReveal(0.2);
-  const display = val !== undefined
-    ? s.key === "tokens"
-      ? `${(animatedVal / 1_000_000_000).toFixed(1)}B+`
-      : `${(animatedVal / 1_000).toFixed(0)}K+`
-    : s.value;
+  const display = val !== undefined ? formatStat(s.key, animatedVal) : s.value;
   return (
     <div ref={ref} className="text-center">
       <div className="text-4xl font-extrabold tracking-tight text-white md:text-5xl transition-all duration-700" style={{ opacity: visible ? 1 : 0, transform: visible ? "scale(1)" : "scale(0.8)" }}>
@@ -470,8 +474,12 @@ export default function LandingPage() {
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/30 mb-6">Supported Platforms</p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               {PLATFORMS.map((p) => (
-                <div key={p.name} className={`flex items-center gap-2 rounded-full px-4 py-2 text-[12px] font-semibold ${p.color}`}>
-                  <span className="text-sm font-black">{p.icon}</span>
+                <div key={p.name} className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-[12px] font-semibold text-white/80">
+                  {p.img ? (
+                    <img src={p.img} alt={p.name} className="h-4 w-4 object-contain" />
+                  ) : (
+                    <span className={`flex h-4 w-4 items-center justify-center rounded text-[10px] font-black ${p.color}`}>{p.letter}</span>
+                  )}
                   {p.name}
                 </div>
               ))}
@@ -699,37 +707,31 @@ export default function LandingPage() {
 
       {/* ═══════ PRICING ═══════ */}
       <section id="pricing" className="px-6 py-24">
-        <div className="mx-auto max-w-6xl">
-          <AnimatedSection className="text-center">
+        <div className="mx-auto max-w-3xl text-center">
+          <AnimatedSection>
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#22d3ee]">Pricing</span>
-            <h2 className="mt-4 text-3xl font-extrabold tracking-tight md:text-4xl">Start building today</h2>
-            <p className="mx-auto mt-3 max-w-md text-[14px] text-white/45">Start free. Upgrade anytime. No recurring fees.</p>
+            <h2 className="mt-4 text-3xl font-extrabold tracking-tight md:text-4xl">Free to use, no limits</h2>
+            <p className="mx-auto mt-3 max-w-md text-[14px] text-white/45">We are currently free to use with no limitations. No recurring fees, no credit card required.</p>
           </AnimatedSection>
-          <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {PRICING.map((plan, i) => (
-              <AnimatedSection key={plan.name} delay={i * 80}>
-                <div className={`relative flex h-full flex-col rounded-2xl border p-5 transition-all hover:-translate-y-1 ${plan.popular ? "border-[#22d3ee]/40 bg-[#111118] shadow-[0_0_40px_rgba(34,211,238,0.1)]" : "border-white/[0.09] bg-[#111118]"}`}>
-                  {plan.popular && <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#22d3ee] px-3 py-1 text-[10px] font-bold uppercase text-[#0a0a0f]">Most Popular</div>}
-                  <h3 className="text-[14px] font-bold text-white">{plan.name}</h3>
-                  <div className="mt-3 text-2xl font-extrabold text-white">{plan.price}</div>
-                  <div className="text-[11px] text-white/40">{plan.credits} {plan.desc}</div>
-                  <div className="my-4 h-px w-full bg-white/[0.07]" />
-                  <ul className="flex-1 space-y-2.5">
-                    {plan.features.map((feat, j) => (
-                      <li key={j} className="flex items-start gap-2 text-[12px] text-white/55">
-                        <Check className="mt-0.5 h-3 w-3 shrink-0 text-[#22d3ee]" />
-                        {feat}
-                      </li>
-                    ))}
-                  </ul>
-                  <a href="/chat" className={`mt-5 block rounded-full py-2.5 text-center text-[12px] font-bold transition-all hover:scale-105 ${plan.popular ? "bg-white text-[#0a0a0f]" : "border border-white/15 bg-white/[0.04] text-white hover:bg-white/[0.08]"}`}>
-                    {plan.cta}
-                  </a>
-                </div>
-              </AnimatedSection>
-            ))}
-          </div>
-          <p className="mt-8 text-center text-[12px] text-white/30">All plans include access to our web-based IDE, version control, and community documentation. Tokens never expire.</p>
+          <AnimatedSection delay={100} className="mt-10">
+            <div className="rounded-2xl border border-emerald-400/25 bg-[#111118] p-8 shadow-[0_0_40px_rgba(52,211,153,0.08)]">
+              <div className="flex items-center justify-center gap-2 text-emerald-400">
+                <span className="relative flex h-3 w-3">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-400" />
+                </span>
+                <span className="text-[11px] font-bold uppercase tracking-[0.25em]">Free to Use</span>
+              </div>
+              <h3 className="mt-4 text-2xl font-extrabold text-white">Currently $0 forever</h3>
+              <p className="mx-auto mt-2 max-w-md text-[14px] text-white/55">
+                Unlimited projects, all AI models, online IDE, version control and community docs — all included while we are free. No limitations.
+              </p>
+              <a href="/chat" className="group mt-6 inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-[13px] font-bold text-[#0a0a0f] transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.3)]">
+                Start Building Now
+                <Sparkles className="h-3.5 w-3.5" />
+              </a>
+            </div>
+          </AnimatedSection>
         </div>
       </section>
 
