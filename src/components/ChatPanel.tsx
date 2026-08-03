@@ -97,13 +97,13 @@ function parseMetadata(metadata: any) {
     return metadata;
 }
 
-function AgentActivityTimeline({ logs, loading, created, edited, search }: { logs: { message: string; type: 'pending' | 'done' | 'error' }[]; loading: boolean; created: string[]; edited: string[]; search: { queries: string[]; sources: { title: string; url: string }[] } | null; }) {
+function AgentActivityTimeline({ logs, loading, created, edited, search, docs }: { logs: { message: string; type: 'pending' | 'done' | 'error' }[]; loading: boolean; created: string[]; edited: string[]; search: { queries: string[]; sources: { title: string; url: string }[] } | null; docs: string[] }) {
     const [expanded, setExpanded] = useState(true);
-    const totalTools = created.length + edited.length + (search?.queries.length || 0);
+    const totalTools = created.length + edited.length + (search?.queries.length || 0) + docs.length;
     if (!logs.length && !search && totalTools === 0) return null;
     return <section className="mx-5 mb-3 overflow-hidden rounded-lg border border-white/[.09] bg-[#10151b] shadow-[0_12px_32px_rgba(0,0,0,.16)]">
         <button type="button" onClick={() => setExpanded(!expanded)} className="flex w-full items-center justify-between border-b border-white/[.06] px-3 py-2 text-left hover:bg-white/[.02]"><span className="flex items-center gap-2"><Brain className={`h-3.5 w-3.5 ${loading ? 'animate-pulse text-violet-300' : 'text-sky-300'}`} /><span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">AI reasoning</span><span className="text-[10px] text-zinc-500">{loading ? 'Thinking…' : 'Complete'}</span></span><span className="flex items-center gap-2 text-[10px] text-zinc-500">{totalTools > 0 && `${totalTools} tool${totalTools === 1 ? '' : 's'}`}<ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? '' : '-rotate-90'}`} /></span></button>
-        {expanded && <div className="divide-y divide-white/[.055]">{logs.map((log, i) => <div key={`${log.message}-${i}`} className="flex items-center gap-2 px-3 py-2 text-[11px]">{log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}<span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}>{log.message}</span></div>)}{search?.queries.map((query, i) => <div key={`search-${i}`} className="px-3 py-2"><div className="flex items-center gap-2 text-[11px] text-zinc-300"><Globe className="h-3.5 w-3.5 text-sky-400" />Searched the web for <span className="truncate text-sky-300">{query}</span></div>{i === 0 && search.sources.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{search.sources.slice(0, 4).map((source, sourceIndex) => <a key={sourceIndex} href={source.url} target="_blank" rel="noreferrer" className="max-w-[180px] truncate rounded border border-sky-400/15 bg-sky-400/[.06] px-1.5 py-1 text-[9px] text-sky-200 hover:bg-sky-400/10">{source.title}</a>)}</div>}</div>)}{(created.length > 0 || edited.length > 0) && <div className="px-3 py-2"><div className="mb-1.5 text-[9px] font-semibold uppercase tracking-[.12em] text-zinc-500">Files changed</div><div className="flex flex-wrap gap-1">{[...created.map(path => ['Created', path]), ...edited.map(path => ['Edited', path])].slice(0, 10).map(([action, path], i) => <span key={i} className="flex max-w-[200px] items-center gap-1 rounded border border-white/[.06] bg-white/[.025] px-1.5 py-1 text-[9px] text-zinc-400"><FileCode className="h-3 w-3 text-sky-300" />{action}: {String(path).split('/').pop()}</span>)}</div></div>}</div>}
+        {expanded && <div className="divide-y divide-white/[.055]">{logs.map((log, i) => <div key={`${log.message}-${i}`} className="flex items-center gap-2 px-3 py-2 text-[11px]">{log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}<span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}>{log.message}</span></div>)}{search?.queries.map((query, i) => <div key={`search-${i}`} className="px-3 py-2"><div className="flex items-center gap-2 text-[11px] text-zinc-300"><Globe className="h-3.5 w-3.5 text-sky-400" />Searched the web for <span className="truncate text-sky-300">{query}</span></div>{i === 0 && search.sources.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{search.sources.slice(0, 4).map((source, sourceIndex) => <a key={sourceIndex} href={source.url} target="_blank" rel="noreferrer" className="max-w-[180px] truncate rounded border border-sky-400/15 bg-sky-400/[.06] px-1.5 py-1 text-[9px] text-sky-200 hover:bg-sky-400/10">{source.title}</a>)}</div>}</div>)}{docs.length > 0 && <div className="px-3 py-2"><div className="flex items-center gap-2 text-[11px] text-zinc-300"><FileText className="h-3.5 w-3.5 text-amber-400" />Read docs</div><div className="mt-2 flex flex-wrap gap-1">{docs.map((doc, i) => <span key={i} className="max-w-[200px] truncate rounded border border-amber-400/15 bg-amber-400/[.06] px-1.5 py-1 text-[9px] text-amber-200">{doc}</span>)}</div></div>}{(created.length > 0 || edited.length > 0) && <div className="px-3 py-2"><div className="mb-1.5 text-[9px] font-semibold uppercase tracking-[.12em] text-zinc-500">Files changed</div><div className="flex flex-wrap gap-1">{[...created.map(path => ['Created', path]), ...edited.map(path => ['Edited', path])].slice(0, 10).map(([action, path], i) => <span key={i} className="flex max-w-[200px] items-center gap-1 rounded border border-white/[.06] bg-white/[.025] px-1.5 py-1 text-[9px] text-zinc-400"><FileCode className="h-3 w-3 text-sky-300" />{action}: {String(path).split('/').pop()}</span>)}</div></div>}</div>}
     </section>;
 }
 
@@ -153,6 +153,7 @@ export const ChatPanel = ({
     const [planApproved, setPlanApproved] = useState(false);
 
     const [searchStatus, setSearchStatus] = useState<{ queries: string[]; sources: { title: string; url: string }[] } | null>(null);
+    const [docsStatus, setDocsStatus] = useState<string[]>([]);
     const abortControllerRef = useRef<AbortController | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -462,6 +463,7 @@ export const ChatPanel = ({
         setLoading(true);
         setGeneratedFiles({ created: [], edited: [] });
         setSearchStatus(null);
+        setDocsStatus([]);
 
         // Create abort controller for this request
         const controller = new AbortController();
@@ -542,6 +544,7 @@ export const ChatPanel = ({
         setLoading(true);
         setGeneratedFiles({ created: [], edited: [] });
         setSearchStatus(null);
+        setDocsStatus([]);
 
         if (typeof window !== 'undefined' && window.location.search) {
             const cleanUrl = window.location.pathname;
@@ -691,7 +694,11 @@ export const ChatPanel = ({
                     logs.push({ message: `Found source: ${ev.title || 'web result'}`, type: 'done' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'docs') {
-                    logs.push({ message: 'Reading project documentation...', type: 'done' });
+                    if (ev.docs && Array.isArray(ev.docs)) {
+                        setDocsStatus(prev => [...prev, ...ev.docs.filter((d: string) => !prev.includes(d))]);
+                    }
+                    const docCount = ev.docs?.length || 0;
+                    logs.push({ message: `Reading ${docCount > 0 ? docCount + ' doc' + (docCount === 1 ? '' : 's') : 'project documentation'}...`, type: 'done' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'model') {
                     logs.push({ message: `Generating with ${ev.model}...`, type: 'pending' });
@@ -820,9 +827,11 @@ export const ChatPanel = ({
             // Build summary message instead of showing raw code
             const createdCount = created.length;
             const editedCount = edited.length;
+            const docsCount = docsStatus.length;
             let summaryParts: string[] = [];
             if (createdCount > 0) summaryParts.push(`${createdCount} file${createdCount > 1 ? 's' : ''} created`);
             if (editedCount > 0) summaryParts.push(`${editedCount} file${editedCount > 1 ? 's' : ''} edited`);
+            if (docsCount > 0) summaryParts.push(`${docsCount} doc${docsCount === 1 ? '' : 's'} read`);
             const summaryText = `Done! I ${summaryParts.join(' and ')}. Check the files panel to see the generated code.`;
 
             setMessages(prev => [
@@ -1006,7 +1015,7 @@ export const ChatPanel = ({
                     </div>
                 )}
 
-                <AgentActivityTimeline logs={statusLog} loading={loading} created={generatedFiles.created} edited={generatedFiles.edited} search={searchStatus} />
+                <AgentActivityTimeline logs={statusLog} loading={loading} created={generatedFiles.created} edited={generatedFiles.edited} search={searchStatus} docs={docsStatus} />
                 {/* Legacy source pills are retained only for backwards-compatible DOM styling. */}
                 {false && (searchStatus?.queries.length || 0) > 0 && (
                     <div className="mx-2 mb-2 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 animate-in fade-in duration-200">
@@ -1041,8 +1050,6 @@ export const ChatPanel = ({
                 )}
 
 {messages.map((msg, i) => {
-    const isLast = i === messages.length - 1;
-    const showFileChips = isLast && msg.role === 'assistant' && generatedFiles.created.length + generatedFiles.edited.length > 0;
     return (
         <React.Fragment key={i}>
             <ChatMessage
@@ -1057,9 +1064,6 @@ export const ChatPanel = ({
                 onApprovePlan={handleApprovePlan}
                 onOpenPlan={onOpenPlanFile}
             />
-            {showFileChips && (
-                <FileChipsSummary created={generatedFiles.created} edited={generatedFiles.edited} />
-            )}
         </React.Fragment>
     );
 })}
@@ -1343,71 +1347,6 @@ export const ChatPanel = ({
                     </div>
                 </div>
             </div>
-        </div>
-    );
-};
-
-const FileChipsSummary = ({ created, edited }: { created: string[]; edited: string[] }) => {
-    const total = created.length + edited.length;
-    if (total === 0) return null;
-
-    return (
-        <div data-file-chips className="mt-2 rounded-xl border border-white/10 bg-[#1a1a1a] overflow-hidden animate-in fade-in duration-200">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
-                <div className="flex items-center gap-2">
-                    <FileCode className="w-3.5 h-3.5 text-zinc-400" />
-                    <span className="text-xs font-semibold text-zinc-200">Used {total} tool{total !== 1 ? 's' : ''}</span>
-                </div>
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                    const el = e.currentTarget.closest('[data-file-chips]') as HTMLElement;
-                    if (el) el.style.display = 'none';
-                    }}
-                    className="p-1 rounded hover:bg-white/10 text-zinc-500 hover:text-zinc-300 transition-colors"
-                >
-                    <X className="w-3.5 h-3.5" />
-                </button>
-            </div>
-
-            {/* Created files */}
-            {created.length > 0 && (
-                <div className="px-4 py-3">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-2">Created</div>
-                    <div className="flex flex-wrap gap-1.5">
-                        {created.map((path, idx) => (
-                            <div
-                                key={`c-${idx}`}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/5 text-[11px] text-zinc-300 hover:bg-white/10 transition-colors cursor-default animate-in fade-in duration-150 fill-mode-both"
-                                style={{ animationDelay: `${idx * 60}ms` }}
-                            >
-                                {getFileIcon(path)}
-                                <span className="truncate max-w-[140px]">{path.split('/').pop()}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Edited files */}
-            {edited.length > 0 && (
-                <div className={`px-4 py-3 ${created.length > 0 ? 'border-t border-white/5' : ''}`}>
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-2">Edited</div>
-                    <div className="flex flex-wrap gap-1.5">
-                        {edited.map((path, idx) => (
-                            <div
-                                key={`e-${idx}`}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/5 text-[11px] text-zinc-400 hover:bg-white/10 transition-colors cursor-default animate-in fade-in duration-150 fill-mode-both"
-                                style={{ animationDelay: `${(created.length + idx) * 60}ms` }}
-                            >
-                                {getFileIcon(path)}
-                                <span className="truncate max-w-[140px]">{path.split('/').pop()}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
