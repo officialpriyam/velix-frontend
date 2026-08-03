@@ -1,14 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Lock, MessageCircle } from "lucide-react";
 import { authApi } from "@/lib/api";
 
 export function SiteAccessGate({ children }: { children: React.ReactNode }) {
-    const [status, setStatus] = useState<{ open: boolean; message?: string } | null>(null);
-    const [loading, setLoading] = useState(true);
+    const pathname = usePathname();
+    const isLanding = pathname === "/";
+    const [status, setStatus] = useState<{ open: boolean; message?: string } | null>(isLanding ? { open: true } : null);
+    const [loading, setLoading] = useState(isLanding ? false : true);
 
     useEffect(() => {
+        if (isLanding) {
+            setStatus({ open: true });
+            setLoading(false);
+            return;
+        }
         let mounted = true;
         const checkStatus = async () => {
             try {
@@ -29,7 +37,7 @@ export function SiteAccessGate({ children }: { children: React.ReactNode }) {
         return () => {
             mounted = false;
         };
-    }, []);
+    }, [isLanding]);
 
     if (loading) {
         return null;

@@ -101,6 +101,7 @@ function parseMetadata(metadata: any) {
 
 function AgentActivityTimeline({ logs, loading }: { logs: { message: string; type: 'pending' | 'done' | 'error' }[]; loading: boolean }) {
     const [expanded, setExpanded] = useState(false);
+    useEffect(() => { if (loading) setExpanded(true); }, [loading]);
     if (!logs.length) return null;
     return <section className="mx-5 mb-3 overflow-hidden rounded-lg border border-white/[.09] bg-[#10151b] shadow-[0_12px_32px_rgba(0,0,0,.16)]">
         <button type="button" onClick={() => setExpanded(!expanded)} className="flex w-full items-center justify-between border-b border-white/[.06] px-3 py-2 text-left hover:bg-white/[.02]"><span className="flex items-center gap-2"><Brain className={`h-3.5 w-3.5 ${loading ? 'animate-pulse text-violet-300' : 'text-sky-300'}`} /><span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">AI reasoning</span><span className="text-[10px] text-zinc-500">{loading ? 'Thinking…' : 'Complete'}</span></span><span className="flex items-center gap-2 text-[10px] text-zinc-500"><ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? '' : '-rotate-90'}`} /></span></button>
@@ -157,6 +158,7 @@ export const ChatPanel = ({
 
     const [searchStatus, setSearchStatus] = useState<{ queries: string[]; sources: { title: string; url: string }[] } | null>(null);
     const [docsStatus, setDocsStatus] = useState<string[]>([]);
+    const [docsChecked, setDocsChecked] = useState(false);
     const [commandStatus, setCommandStatus] = useState<{ command: string; status: string; output?: string }[]>([]);
     const [downloadStatus, setDownloadStatus] = useState<{ url: string; path: string; success: boolean }[]>([]);
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -484,6 +486,7 @@ export const ChatPanel = ({
         setGeneratedFiles({ created: [], edited: [] });
         setSearchStatus(null);
         setDocsStatus([]);
+        setDocsChecked(false);
         setCommandStatus([]);
         setDownloadStatus([]);
 
@@ -727,6 +730,7 @@ export const ChatPanel = ({
                     logs.push({ message: `Found source: ${ev.title || 'web result'}`, type: 'done' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'docs') {
+                    setDocsChecked(true);
                     if (ev.docs && Array.isArray(ev.docs)) {
                         ev.docs.forEach((d: string) => { if (!localDocs.includes(d)) localDocs.push(d); });
                         setDocsStatus([...localDocs]);
@@ -1149,7 +1153,7 @@ export const ChatPanel = ({
     <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
         <FilesChangedBox files={undefined} created={generatedFiles.created} edited={generatedFiles.edited} onOpenFile={onOpenFile} />
         <SearchBox search={searchStatus || undefined} />
-        <DocsBox docs={docsStatus} />
+        <DocsBox docs={docsStatus} checked={docsChecked} />
         <CommandsBox commands={commandStatus} />
         <DownloadsBox downloads={downloadStatus} />
     </div>

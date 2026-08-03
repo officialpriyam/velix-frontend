@@ -84,9 +84,7 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
         if (el) {
             const rect = el.getBoundingClientRect();
             const spaceBelow = window.innerHeight - rect.bottom;
-            const spaceAbove = rect.top;
-            const estHeight = 380;
-            setOpenUp(spaceBelow < estHeight && spaceAbove > spaceBelow);
+            setOpenUp(false);
         }
         return () => document.removeEventListener('click', handler);
     }, [isOpen]);
@@ -112,7 +110,7 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] px-3 py-1.5 text-xs text-foreground/80 flex items-center gap-1.5 hover:text-foreground hover:bg-[hsl(var(--surface-sunk))]/80 transition-all shadow-sm font-medium"
+                className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] px-3 py-1.5 text-xs text-foreground/80 flex items-center gap-1.5 hover:text-foreground hover:bg-[hsl(var(--surface-sunk))]/80 transition-all shadow-sm font-medium relative z-50"
             >
                 <Sparkles className="w-3.5 h-3.5 text-primary" />
                 <span className="truncate max-w-[130px]">{getDisplayName(selectedModel)}</span>
@@ -120,7 +118,7 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
             </button>
 
             {isOpen && (
-                <div className={`absolute left-0 z-50 w-[280px] sm:w-[320px] rounded-2xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] p-2.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 ${openUp ? 'bottom-full mb-2' : 'top-full mt-2'}`}>
+                <div className={`absolute left-0 z-[100] w-[280px] sm:w-[320px] rounded-2xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] p-2.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 ${openUp ? 'bottom-full mb-2' : 'top-full mt-2'}`}>
                     <div className="relative mb-2">
                         <Search className="w-3.5 h-3.5 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
                         <input

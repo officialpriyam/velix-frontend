@@ -54,11 +54,11 @@ export function SearchBox({ search }: { search?: { queries: string[]; sources: {
   </div>;
 }
 
-export function DocsBox({ docs }: { docs?: string[] }) {
-  if (!docs?.length) return null;
+export function DocsBox({ docs, checked }: { docs?: string[]; checked?: boolean }) {
+  if (!docs?.length && !checked) return null;
   return <div className={boxBase}>
     <div className={boxHeader}><FileText className="h-3.5 w-3.5 text-amber-400" /><span className={boxTitle}>Read docs</span></div>
-    <div className="flex flex-wrap gap-1 px-3 py-2">{docs.slice(0, 20).map((doc, i) => <span key={i} className="max-w-[200px] truncate rounded border border-amber-400/15 bg-amber-400/[.06] px-1.5 py-1 text-[9px] text-amber-200">{doc}</span>)}</div>
+    {docs?.length ? <div className="flex flex-wrap gap-1 px-3 py-2">{docs.slice(0, 20).map((doc, i) => <span key={i} className="max-w-[200px] truncate rounded border border-amber-400/15 bg-amber-400/[.06] px-1.5 py-1 text-[9px] text-amber-200">{doc}</span>)}</div> : <div className="px-3 py-2 text-[11px] text-zinc-400">Checked documentation — no relevant docs matched this request.</div>}
   </div>;
 }
 
