@@ -27,7 +27,7 @@ const boxBase = 'mt-3 overflow-hidden rounded-lg border border-white/[.09] bg-[#
 const boxHeader = 'flex items-center gap-2 border-b border-white/[.06] px-3 py-2';
 const boxTitle = 'text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300';
 
-function FilesChangedBox({ files, created, edited }: { files?: { path: string; size?: number }[]; created?: string[]; edited?: string[] }) {
+export function FilesChangedBox({ files, created, edited }: { files?: { path: string; size?: number }[]; created?: string[]; edited?: string[] }) {
   const createdPaths = created && created.length > 0 ? created : (files || []).map(f => f.path);
   const editedPaths = edited || [];
   const list = (paths: string[], color: string, prefix: string) => paths.length > 0 && <div className="flex flex-wrap gap-1">{paths.slice(0, 20).map((p, i) => <span key={i} className="flex max-w-[220px] items-center gap-1 rounded border border-white/[.06] bg-white/[.025] px-1.5 py-1 text-[10px] text-zinc-400"><FileCode className="h-3 w-3 shrink-0" /><span className={`truncate ${color}`}>{p}</span></span>)}</div>;
@@ -41,7 +41,7 @@ function FilesChangedBox({ files, created, edited }: { files?: { path: string; s
   </div>;
 }
 
-function SearchBox({ search }: { search?: { queries: string[]; sources: { title: string; url: string }[] } }) {
+export function SearchBox({ search }: { search?: { queries: string[]; sources: { title: string; url: string }[] } }) {
   if (!search?.queries?.length) return null;
   return <div className={boxBase}>
     <div className={boxHeader}><Globe className="h-3.5 w-3.5 text-sky-400" /><span className={boxTitle}>Web search</span></div>
@@ -52,7 +52,7 @@ function SearchBox({ search }: { search?: { queries: string[]; sources: { title:
   </div>;
 }
 
-function DocsBox({ docs }: { docs?: string[] }) {
+export function DocsBox({ docs }: { docs?: string[] }) {
   if (!docs?.length) return null;
   return <div className={boxBase}>
     <div className={boxHeader}><FileText className="h-3.5 w-3.5 text-amber-400" /><span className={boxTitle}>Read docs</span></div>
@@ -60,7 +60,7 @@ function DocsBox({ docs }: { docs?: string[] }) {
   </div>;
 }
 
-function CommandsBox({ commands }: { commands?: { command: string; status: string; output?: string }[] }) {
+export function CommandsBox({ commands }: { commands?: { command: string; status: string; output?: string }[] }) {
   if (!commands?.length) return null;
   return <div className={boxBase}>
     <div className={boxHeader}><TerminalSquare className="h-3.5 w-3.5 text-violet-400" /><span className={boxTitle}>Commands run</span></div>
@@ -71,7 +71,7 @@ function CommandsBox({ commands }: { commands?: { command: string; status: strin
   </div>;
 }
 
-function DownloadsBox({ downloads }: { downloads?: { url: string; path: string; success: boolean }[] }) {
+export function DownloadsBox({ downloads }: { downloads?: { url: string; path: string; success: boolean }[] }) {
   if (!downloads?.length) return null;
   return <div className={boxBase}>
     <div className={boxHeader}><Download className="h-3.5 w-3.5 text-sky-400" /><span className={boxTitle}>Downloads</span></div>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ChatMessage } from './ChatMessage';
+import { ChatMessage, FilesChangedBox, SearchBox, DocsBox, CommandsBox, DownloadsBox } from './ChatMessage';
 import { ModelSelector } from './ModelSelector';
 import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square, Globe, Brain, Eye, ChevronDown, TerminalSquare } from 'lucide-react';
 import { aiApi, copyToClipboard } from '../lib/api';
@@ -99,7 +99,7 @@ function parseMetadata(metadata: any) {
 }
 
 function AgentActivityTimeline({ logs, loading }: { logs: { message: string; type: 'pending' | 'done' | 'error' }[]; loading: boolean }) {
-    const [expanded, setExpanded] = useState(true);
+    const [expanded, setExpanded] = useState(false);
     if (!logs.length) return null;
     return <section className="mx-5 mb-3 overflow-hidden rounded-lg border border-white/[.09] bg-[#10151b] shadow-[0_12px_32px_rgba(0,0,0,.16)]">
         <button type="button" onClick={() => setExpanded(!expanded)} className="flex w-full items-center justify-between border-b border-white/[.06] px-3 py-2 text-left hover:bg-white/[.02]"><span className="flex items-center gap-2"><Brain className={`h-3.5 w-3.5 ${loading ? 'animate-pulse text-violet-300' : 'text-sky-300'}`} /><span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">AI reasoning</span><span className="text-[10px] text-zinc-500">{loading ? 'Thinking…' : 'Complete'}</span></span><span className="flex items-center gap-2 text-[10px] text-zinc-500"><ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? '' : '-rotate-90'}`} /></span></button>
@@ -170,9 +170,10 @@ export const ChatPanel = ({
         const el = scrollRef.current;
         if (!el) return;
         const onScroll = () => {
-            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-            setScrolledDown(!atBottom);
+            const scrolledFromTop = el.scrollTop > 60;
+            setScrolledDown(scrolledFromTop);
         };
+        onScroll();
         el.addEventListener('scroll', onScroll, { passive: true });
         return () => el.removeEventListener('scroll', onScroll);
     }, []);
@@ -1071,7 +1072,7 @@ export const ChatPanel = ({
                 )}
 
                 {loading && statusLog.length > 0 && (
-                    <div className="sticky top-0 z-10 px-5 pt-2 -mt-2 bg-[#0c1117]/90 backdrop-blur">
+                    <div className="sticky top-0 z-10 px-5 pt-2 -mt-2">
                         <AgentActivityTimeline logs={statusLog} loading />
                     </div>
                 )}
@@ -1127,6 +1128,17 @@ export const ChatPanel = ({
         </React.Fragment>
     );
 })}
+
+{loading && (
+    <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
+        <FilesChangedBox files={undefined} created={generatedFiles.created} edited={generatedFiles.edited} />
+        <SearchBox search={searchStatus || undefined} />
+        <DocsBox docs={docsStatus} />
+        <CommandsBox commands={commandStatus} />
+        <DownloadsBox downloads={downloadStatus} />
+    </div>
+)}
+
 
                 {compiling && !buildResult && (
                     <div className="animate-in fade-in duration-200 rounded-xl border border-[hsl(var(--surface-sunk))] overflow-hidden">
