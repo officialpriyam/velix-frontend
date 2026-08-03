@@ -24,7 +24,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ p
     return proxy(req, (await params).path.join('/'), 'DELETE');
 }
 
-async function proxy(req: NextRequest, path: string, method: string): Promise<NextResponse> {
+async function proxy(req: NextRequest, path: string, method: string): Promise<Response> {
     try {
         let body: string | undefined;
         if (method !== 'GET' && method !== 'DELETE') {
@@ -37,8 +37,16 @@ async function proxy(req: NextRequest, path: string, method: string): Promise<Ne
         const cookie = req.headers.get('cookie') || '';
         const contentType = req.headers.get('content-type') || 'application/json';
         const isBinary = BINARY_PREFIXES.some(p => path.startsWith(p));
+        const query = req.nextUrl.search || '';
 
-        const result = await httpRequest(path, method, body, cookie, contentType, isBinary);
+        // SSE / live-streaming requests must be piped through without buffering
+        const wantsStream = req.nextUrl.searchParams.get('stream') === 'true';
+
+        if (wantsStream && !isBinary) {
+            return await httpStreamingRequest(path, query, method, body, cookie, contentType);
+        }
+
+        const result = await httpRequest(path, query, method, body, cookie, contentType, isBinary);
 
         if (isBinary) {
             const headers = new Headers();
@@ -77,25 +85,80 @@ interface ProxyResult {
     setCookies: string[];
 }
 
-function httpRequest(path: string, method: string, body?: string, cookie?: string, contentType?: string, binary: boolean = false): Promise<ProxyResult> {
+function backendOptions(path: string, query: string, method: string, body?: string, cookie?: string, contentType?: string) {
     const backendUrl = process.env.BACKEND_URL || 'http://127.0.0.1:3006';
     const parsed = new URL(backendUrl);
-
-    return new Promise((resolve, reject) => {
-        const isHttps = parsed.protocol === 'https:';
-        const options: http.RequestOptions = {
+    return {
+        isHttps: parsed.protocol === 'https:',
+        options: {
             hostname: parsed.hostname,
-            port: parsed.port || (isHttps ? 443 : 80),
-            path: `/api/${path}`,
+            port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+            path: `/api/${path}${query}`,
             method,
             headers: {
                 'Content-Type': contentType || 'application/json',
                 ...(cookie ? { 'cookie': cookie } : {}),
                 ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {})
             },
-            timeout: 180000
-        };
+            timeout: 300000
+        } as http.RequestOptions
+    };
+}
 
+/**
+ * Streaming proxy for SSE. Pipes each upstream chunk straight to the client
+ * so live events (file creation, model progress, etc.) arrive in real-time.
+ */
+function httpStreamingRequest(path: string, query: string, method: string, body?: string, cookie?: string, contentType?: string): Promise<Response> {
+    const { isHttps, options } = backendOptions(path, query, method, body, cookie, contentType);
+
+    return new Promise((resolve, reject) => {
+        const client = isHttps ? https : http;
+        const req = client.request(options, (res) => {
+            const headers = new Headers();
+            const ct = res.headers['content-type'];
+            headers.set('Content-Type', ct || 'application/json');
+            if (res.headers['x-accel-buffering']) headers.set('X-Accel-Buffering', String(res.headers['x-accel-buffering']));
+            if (res.headers['cache-control']) headers.set('Cache-Control', String(res.headers['cache-control']));
+            const setCookies = res.headers['set-cookie'];
+            if (setCookies) {
+                for (const sc of (Array.isArray(setCookies) ? setCookies : [setCookies])) {
+                    headers.append('Set-Cookie', sc);
+                }
+            }
+
+            const stream = new ReadableStream<Uint8Array>({
+                start(controller) {
+                    res.on('data', (chunk: Buffer) => {
+                        try { controller.enqueue(new Uint8Array(chunk)); } catch {}
+                    });
+                    res.on('end', () => {
+                        try { controller.close(); } catch {}
+                    });
+                    res.on('error', (err: Error) => {
+                        try { controller.error(err); } catch {}
+                    });
+                },
+                cancel() {
+                    res.destroy();
+                    req.destroy();
+                }
+            });
+
+            resolve(new Response(stream, { status: res.statusCode || 200, headers }));
+        });
+
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('Request timed out')); });
+        if (body) req.write(body);
+        req.end();
+    });
+}
+
+function httpRequest(path: string, query: string, method: string, body?: string, cookie?: string, contentType?: string, binary: boolean = false): Promise<ProxyResult> {
+    const { isHttps, options } = backendOptions(path, query, method, body, cookie, contentType);
+
+    return new Promise((resolve, reject) => {
         const client = isHttps ? https : http;
         const req = client.request(options, (res) => {
             const chunks: Buffer[] = [];

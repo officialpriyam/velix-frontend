@@ -1,0 +1,9 @@
+TypeError: Invalid character in header content ["Permissions-Policy"]
+    at ignore-listed frames {
+  code: 'ERR_INVALID_CHAR'
+}
+TypeError: Invalid character in header content ["Permissions-Policy"]
+    at ignore-listed frames {
+  code: 'ERR_INVALID_CHAR'
+}
+⚠ Found a change in next.config.ts. Restarting the server to apply the changes...

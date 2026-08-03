@@ -1,0 +1,24 @@
+
+> frontend@1.0.0 dev
+> next dev -p 3005
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3005
+- Network:       http://185.172.175.223:3005
+- Environments: .env
+- Experiments (use with caution):
+  · serverActions
+
+✓ Starting...
+✓ Ready in 2.5s
+ POST /api/ai/generate?stream=true 500 in 557ms (compile: 446ms, render: 111ms)
+ GET /api/ai/models 500 in 32ms (compile: 14ms, render: 17ms)
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3005
+- Network:       http://185.172.175.223:3005
+- Environments: .env
+- Experiments (use with caution):
+  · serverActions
+
+✓ Starting...
+✓ Ready in 2.5s
