@@ -26,12 +26,57 @@ async function safeJson(res: Response) {
 }
 
 export const aiApi = {
-    generate: async (prompt: string, language: string, model?: string, sessionId?: string, platform?: string, signal?: AbortSignal, enableWebSearch?: boolean, images?: Array<{ data: string; mimeType: string }>, fileContext?: Array<{ path: string; content: string }>, chatMode?: boolean, fromPlan?: boolean, planMessageId?: number) => {
+    generate: async (prompt: string, language: string, model?: string, sessionId?: string, platform?: string, signal?: AbortSignal, enableWebSearch?: boolean, images?: Array<{ data: string; mimeType: string }>, fileContext?: Array<{ path: string; content: string }>, chatMode?: boolean, fromPlan?: boolean, planMessageId?: number, onProgress?: (event: { event?: string; type?: string; query?: string; title?: string; url?: string; path?: string; op?: string; model?: string }) => void) => {
+        const body = JSON.stringify({ prompt, language, model, sessionId, platform, enableWebSearch, images, fileContext, chatMode, fromPlan, planMessageId });
+        if (onProgress) {
+            const res = await fetch(`${BASE_URL}/ai/generate?stream=true`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body,
+                signal
+            });
+            if (!res.ok || !res.body) return safeJson(res);
+            const contentType = res.headers.get('content-type') || '';
+            if (!contentType.includes('text/event-stream')) return safeJson(res);
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let finalResult: any = null;
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    let sep;
+                    while ((sep = buffer.indexOf('\n\n')) !== -1) {
+                        const chunk = buffer.slice(0, sep);
+                        buffer = buffer.slice(sep + 2);
+                        let event = 'message';
+                        let data = '';
+                        for (const line of chunk.split('\n')) {
+                            if (line.startsWith('event:')) event = line.slice(6).trim();
+                            else if (line.startsWith('data:')) data = line.slice(5).trim();
+                        }
+                        if (!data) continue;
+                        let parsed: any;
+                        try { parsed = JSON.parse(data); } catch { continue; }
+                        if (event === 'complete') { finalResult = parsed; break; }
+                        onProgress({ event, ...parsed });
+                    }
+                }
+            } catch (err: any) {
+                if (err?.name === 'AbortError') throw err;
+                throw err;
+            }
+            if (finalResult) return finalResult;
+            return { error: 'Generation stream ended without a result. Please try again.' };
+        }
         const res = await fetch(`${BASE_URL}/ai/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ prompt, language, model, sessionId, platform, enableWebSearch, images, fileContext, chatMode, fromPlan, planMessageId }),
+            body,
             signal
         });
         return safeJson(res);

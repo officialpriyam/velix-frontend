@@ -579,6 +579,8 @@ export const ChatPanel = ({
             { message: 'Analyzing request...', type: 'done' }
         ];
 
+        let streamedFiles = false;
+
         if (!effectiveChatMode) {
             setStatusLog([...logs, { message: `Loading ${skillLabel} ${modeLabel.toLowerCase()} skills...`, type: 'pending' }]);
             await new Promise(r => setTimeout(r, 400));
@@ -672,6 +674,40 @@ export const ChatPanel = ({
                     }))
                 : [];
 
+            // Live progress updates streamed from the backend via SSE
+            let searchQuery = '';
+            const onProgress = (ev: any) => {
+                if (ev.event === 'searching') {
+                    searchQuery = ev.query || searchQuery;
+                    logs.push({ message: 'Searching the web...', type: 'pending' });
+                    setStatusLog([...logs]);
+                } else if (ev.event === 'search') {
+                    if (ev.title && ev.url) {
+                        setSearchStatus(prev => ({
+                            queries: [...(prev?.queries || []), searchQuery || 'the web'],
+                            sources: [...(prev?.sources || []), { title: ev.title, url: ev.url }]
+                        }));
+                    }
+                    logs.push({ message: `Found source: ${ev.title || 'web result'}`, type: 'done' });
+                    setStatusLog([...logs]);
+                } else if (ev.event === 'docs') {
+                    logs.push({ message: 'Reading project documentation...', type: 'done' });
+                    setStatusLog([...logs]);
+                } else if (ev.event === 'model') {
+                    logs.push({ message: `Generating with ${ev.model}...`, type: 'pending' });
+                    setStatusLog([...logs]);
+                } else if (ev.event === 'file') {
+                    streamedFiles = true;
+                    const isNew = ev.op === 'created';
+                    setGeneratedFiles(prev => ({
+                        created: isNew ? [...prev.created, ev.path] : prev.created,
+                        edited: isNew ? prev.edited : [...prev.edited, ev.path]
+                    }));
+                    logs.push({ message: `${isNew ? '+' : '~'} ${isNew ? 'Created' : 'Edited'} ${ev.path}`, type: 'done' });
+                    setStatusLog([...logs]);
+                }
+            };
+
             result = await aiApi.generate(
                 optimizedPrompt, language, model, sessionId || undefined, platform, abortControllerRef.current?.signal,
                 enableWebSearch,
@@ -679,7 +715,8 @@ export const ChatPanel = ({
                 fileContextEntries.length > 0 ? fileContextEntries : undefined,
                 effectiveChatMode,
                 Boolean(approvedPlanId),
-                approvedPlanId
+                approvedPlanId,
+                onProgress
             );
         } catch (fetchErr: any) {
             if (fetchErr.name === 'AbortError') {
@@ -737,41 +774,48 @@ export const ChatPanel = ({
                 else edited.push(file.path);
             }
 
-            const fileLogs: { message: string; type: 'pending' | 'done' | 'error' }[] = [
-                { message: 'Request analyzed', type: 'done' },
-                { message: `Documentation matched (${skillLabel})`, type: 'done' },
-                { message: 'Architecture planned', type: 'done' }
-            ];
-            setStatusLog([...fileLogs]);
-
-            // Progressively reveal files one by one
-            const revealCreated: string[] = [];
-            const revealEdited: string[] = [];
-
-            for (let i = 0; i < result.files.length; i++) {
-                const file = result.files[i];
-                const isNew = file.content && !file.content.startsWith('// Edit');
-                const opLabel = isNew ? 'Created' : 'Edited';
-                const opIcon = isNew ? '+' : '~';
-
-                if (isNew) revealCreated.push(file.path);
-                else revealEdited.push(file.path);
-
-                setGeneratedFiles({ created: [...revealCreated], edited: [...revealEdited] });
-
-                fileLogs.push({ message: `${opIcon} ${opLabel} ${file.path}`, type: 'pending' });
+            if (streamedFiles) {
+                // Files were already revealed live via SSE — just confirm completion
+                setGeneratedFiles({ created, edited });
+                logs.push({ message: `${platformLabel} ${modeLabel} assembly complete!`, type: 'done' });
+                setStatusLog([...logs]);
+            } else {
+                const fileLogs: { message: string; type: 'pending' | 'done' | 'error' }[] = [
+                    { message: 'Request analyzed', type: 'done' },
+                    { message: `Documentation matched (${skillLabel})`, type: 'done' },
+                    { message: 'Architecture planned', type: 'done' }
+                ];
                 setStatusLog([...fileLogs]);
-                await new Promise(r => setTimeout(r, 120));
-                fileLogs[fileLogs.length - 1] = { message: `${opIcon} ${opLabel} ${file.path}`, type: 'done' };
+
+                // Progressively reveal files one by one
+                const revealCreated: string[] = [];
+                const revealEdited: string[] = [];
+
+                for (let i = 0; i < result.files.length; i++) {
+                    const file = result.files[i];
+                    const isNew = file.content && !file.content.startsWith('// Edit');
+                    const opLabel = isNew ? 'Created' : 'Edited';
+                    const opIcon = isNew ? '+' : '~';
+
+                    if (isNew) revealCreated.push(file.path);
+                    else revealEdited.push(file.path);
+
+                    setGeneratedFiles({ created: [...revealCreated], edited: [...revealEdited] });
+
+                    fileLogs.push({ message: `${opIcon} ${opLabel} ${file.path}`, type: 'pending' });
+                    setStatusLog([...fileLogs]);
+                    await new Promise(r => setTimeout(r, 120));
+                    fileLogs[fileLogs.length - 1] = { message: `${opIcon} ${opLabel} ${file.path}`, type: 'done' };
+                    setStatusLog([...fileLogs]);
+                }
+
+                fileLogs.push({ message: `${platformLabel} ${modeLabel} assembly complete!`, type: 'done' });
                 setStatusLog([...fileLogs]);
             }
 
-            fileLogs.push({ message: `${platformLabel} ${modeLabel} assembly complete!`, type: 'done' });
-            setStatusLog([...fileLogs]);
-
             // Build summary message instead of showing raw code
-            const createdCount = revealCreated.length;
-            const editedCount = revealEdited.length;
+            const createdCount = created.length;
+            const editedCount = edited.length;
             let summaryParts: string[] = [];
             if (createdCount > 0) summaryParts.push(`${createdCount} file${createdCount > 1 ? 's' : ''} created`);
             if (editedCount > 0) summaryParts.push(`${editedCount} file${editedCount > 1 ? 's' : ''} edited`);
