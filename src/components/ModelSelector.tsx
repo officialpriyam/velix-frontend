@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, ChevronDown, Search, Check, Zap, Award } from 'lucide-react';
 import { aiApi } from '@/lib/api';
 
@@ -8,7 +8,7 @@ export interface ModelItem {
     id: string;
     name: string;
     description?: string;
-    provider?: 'openrouter' | 'nvidia' | 'llmgate' | 'orac' | 'priyx';
+    provider?: 'openrouter' | 'nvidia' | 'llmgate' | 'orac' | 'priyx' | 'requesty';
 }
 
 export interface ModelTiersData {
@@ -57,6 +57,8 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
     const [tiersData, setTiersData] = useState<ModelTiersData | null>(null);
     const [flatModels, setFlatModels] = useState<ModelItem[]>([]);
     const [expandedTier, setExpandedTier] = useState<string | null>(null);
+    const [openUp, setOpenUp] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const getRandomModels = (models: ModelItem[], count: number = 3): ModelItem[] => {
         if (!models || models.length === 0) return [];
@@ -78,6 +80,14 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
         if (!isOpen) return;
         const handler = () => setIsOpen(false);
         document.addEventListener('click', handler);
+        const el = containerRef.current;
+        if (el) {
+            const rect = el.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            const estHeight = 380;
+            setOpenUp(spaceBelow < estHeight && spaceAbove > spaceBelow);
+        }
         return () => document.removeEventListener('click', handler);
     }, [isOpen]);
 
@@ -88,16 +98,17 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
         if (id === 'llmgate') return 'LLMGATE';
         if (id === 'orac') return 'orac';
         if (id === 'priyx') return 'Priyx';
+        if (id === 'requesty') return 'Requesty';
         const found = flatModels.find(m => m.id === id);
         if (found) return found.name || found.id;
         return id.split('/').pop()?.replace(/:free/g, '').replace(/-/g, ' ') || id;
     };
 
     const specialtyModels = (flatModels.length > 0 ? flatModels : (tiersData?.lite?.models || []))
-        .filter((m: any) => ['llmgate', 'orac', 'priyx'].includes(m.provider));
+        .filter((m: any) => ['llmgate', 'orac', 'priyx', 'requesty'].includes(m.provider));
 
     return (
-        <div className="relative w-fit" onClick={e => e.stopPropagation()}>
+        <div className="relative w-fit" ref={containerRef} onClick={e => e.stopPropagation()}>
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
@@ -109,7 +120,7 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
             </button>
 
             {isOpen && (
-                <div className="absolute top-full left-0 mt-2 w-[280px] sm:w-[320px] rounded-2xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] p-2.5 z-50 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
+                <div className={`absolute left-0 z-50 w-[280px] sm:w-[320px] rounded-2xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] p-2.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 ${openUp ? 'bottom-full mb-2' : 'top-full mt-2'}`}>
                     <div className="relative mb-2">
                         <Search className="w-3.5 h-3.5 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
                         <input

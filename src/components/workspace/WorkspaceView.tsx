@@ -1447,10 +1447,10 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                                     </div>
 
                                     {/* Specialty Providers */}
-                                    {(modelTiers?.lite?.models || []).filter((m: any) => ['llmgate', 'orac', 'priyx'].includes(m.provider)).length > 0 && (
+                                    {(modelTiers?.lite?.models || []).filter((m: any) => ['llmgate', 'orac', 'priyx', 'requesty'].includes(m.provider)).length > 0 && (
                                         <div className="space-y-3 mb-4">
                                             <div className="text-[10px] font-bold uppercase tracking-wider text-muted">Specialty Providers</div>
-                                            {(modelTiers?.lite?.models || []).filter((m: any) => ['llmgate', 'orac', 'priyx'].includes(m.provider)).map((m: any) => (
+                                            {(modelTiers?.lite?.models || []).filter((m: any) => ['llmgate', 'orac', 'priyx', 'requesty'].includes(m.provider)).map((m: any) => (
                                                 <button
                                                     key={m.id}
                                                     onClick={() => handleModelChange(m.id)}
