@@ -728,6 +728,10 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                             if (files['plan.md']) setSelectedFile('plan.md');
                             else loadFiles(sessionId, 'plan.md');
                         }}
+                        onOpenFile={(path) => {
+                            if (files[path]) setSelectedFile(path);
+                            else loadFiles(sessionId, path);
+                        }}
                         language={language}
                         platform={platform}
                         model={model}

@@ -54,6 +54,7 @@ interface ChatPanelProps {
     projectFiles?: Record<string, string>;
     onPlanCreated?: (content: string) => void;
     onOpenPlanFile?: () => void;
+    onOpenFile?: (path: string) => void;
 }
 
 function getFileIcon(filename: string) {
@@ -129,7 +130,8 @@ export const ChatPanel = ({
     onInitialPromptHandled,
     initialPromptForceBuild,
     onPlanCreated,
-    onOpenPlanFile
+    onOpenPlanFile,
+    onOpenFile
 }: ChatPanelProps) => {
     const { showNotification } = useNotification();
     const router = useRouter();
@@ -568,6 +570,13 @@ export const ChatPanel = ({
         setCommandStatus([]);
         setDownloadStatus([]);
 
+        // Local accumulators — populated live by onProgress and baked into the
+        // summary message metadata (React state would be stale in this closure).
+        const localSearch: { queries: string[]; sources: { title: string; url: string }[] } = { queries: [], sources: [] };
+        const localDocs: string[] = [];
+        const localCommands: { command: string; status: string; output?: string }[] = [];
+        const localDownloads: { url: string; path: string; success: boolean }[] = [];
+
         if (typeof window !== 'undefined' && window.location.search) {
             const cleanUrl = window.location.pathname;
             window.history.replaceState({}, '', cleanUrl);
@@ -708,16 +717,16 @@ export const ChatPanel = ({
                     setStatusLog([...logs]);
                 } else if (ev.event === 'search') {
                     if (ev.title && ev.url) {
-                        setSearchStatus(prev => ({
-                            queries: [...(prev?.queries || []), searchQuery || 'the web'],
-                            sources: [...(prev?.sources || []), { title: ev.title, url: ev.url }]
-                        }));
+                        if (!localSearch.queries.includes(searchQuery)) localSearch.queries.push(searchQuery || 'the web');
+                        localSearch.sources.push({ title: ev.title, url: ev.url });
+                        setSearchStatus({ queries: [...localSearch.queries], sources: [...localSearch.sources] });
                     }
                     logs.push({ message: `Found source: ${ev.title || 'web result'}`, type: 'done' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'docs') {
                     if (ev.docs && Array.isArray(ev.docs)) {
-                        setDocsStatus(prev => [...prev, ...ev.docs.filter((d: string) => !prev.includes(d))]);
+                        ev.docs.forEach((d: string) => { if (!localDocs.includes(d)) localDocs.push(d); });
+                        setDocsStatus([...localDocs]);
                     }
                     const docCount = ev.docs?.length || 0;
                     logs.push({ message: `Reading ${docCount > 0 ? docCount + ' doc' + (docCount === 1 ? '' : 's') : 'project documentation'}...`, type: 'done' });
@@ -742,24 +751,19 @@ export const ChatPanel = ({
                     if (ev.status === 'running') {
                         logs.push({ message: `Running command: ${ev.command}`, type: 'pending' });
                     } else {
-                        setCommandStatus(prev => {
-                            const existing = prev.findIndex(c => c.command === ev.command);
-                            const entry = { command: ev.command, status: ev.status === 'done' ? 'done' : 'error', output: ev.output };
-                            if (existing >= 0) {
-                                const copy = [...prev];
-                                copy[existing] = entry;
-                                return copy;
-                            }
-                            return [...prev, entry];
-                        });
+                        const entry = { command: ev.command, status: ev.status === 'done' ? 'done' : 'error', output: ev.output };
+                        const existing = localCommands.findIndex(c => c.command === ev.command);
+                        if (existing >= 0) localCommands[existing] = entry;
+                        else localCommands.push(entry);
+                        setCommandStatus([...localCommands]);
                         logs.push({ message: `Command ${ev.status === 'done' ? 'completed' : 'failed'}: ${ev.command}`, type: ev.status === 'done' ? 'done' : 'error' });
                     }
                     setStatusLog([...logs]);
                 } else if (ev.event === 'download') {
-                    setDownloadStatus(prev => {
-                        if (prev.some(d => d.url === ev.url)) return prev;
-                        return [...prev, { url: ev.url, path: ev.path || '', success: ev.success !== false }];
-                    });
+                    if (!localDownloads.some(d => d.url === ev.url)) {
+                        localDownloads.push({ url: ev.url, path: ev.path || '', success: ev.success !== false });
+                        setDownloadStatus([...localDownloads]);
+                    }
                     logs.push({ message: `Downloaded ${ev.success !== false ? '' : '(failed) '}${ev.path || ev.url}`, type: ev.success !== false ? 'done' : 'error' });
                     setStatusLog([...logs]);
                 }
@@ -873,7 +877,7 @@ export const ChatPanel = ({
             // Build summary message instead of showing raw code
             const createdCount = created.length;
             const editedCount = edited.length;
-            const docsCount = docsStatus.length;
+            const docsCount = localDocs.length;
             let summaryParts: string[] = [];
             if (createdCount > 0) summaryParts.push(`${createdCount} file${createdCount > 1 ? 's' : ''} created`);
             if (editedCount > 0) summaryParts.push(`${editedCount} file${editedCount > 1 ? 's' : ''} edited`);
@@ -886,10 +890,10 @@ export const ChatPanel = ({
                     files: result.files.map((file: any) => ({ path: file.path, size: file.content?.length || 0 })),
                     created,
                     edited,
-                    search: searchStatus || undefined,
-                    docs: docsStatus.length > 0 ? docsStatus : undefined,
-                    commands: commandStatus.length > 0 ? commandStatus : undefined,
-                    downloads: downloadStatus.length > 0 ? downloadStatus : undefined,
+                    search: localSearch.queries.length > 0 ? localSearch : undefined,
+                    docs: localDocs.length > 0 ? localDocs : undefined,
+                    commands: localCommands.length > 0 ? localCommands : undefined,
+                    downloads: localDownloads.length > 0 ? localDownloads : undefined,
                     status: 'completed'
                 } }
             ]);
@@ -1124,6 +1128,7 @@ export const ChatPanel = ({
                 onSavePlan={handleSavePlan}
                 onApprovePlan={handleApprovePlan}
                 onOpenPlan={onOpenPlanFile}
+                onOpenFile={onOpenFile}
             />
         </React.Fragment>
     );
@@ -1131,7 +1136,7 @@ export const ChatPanel = ({
 
 {loading && (
     <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
-        <FilesChangedBox files={undefined} created={generatedFiles.created} edited={generatedFiles.edited} />
+        <FilesChangedBox files={undefined} created={generatedFiles.created} edited={generatedFiles.edited} onOpenFile={onOpenFile} />
         <SearchBox search={searchStatus || undefined} />
         <DocsBox docs={docsStatus} />
         <CommandsBox commands={commandStatus} />

@@ -9,6 +9,7 @@ interface Props {
   id?: number; role: 'user' | 'assistant'; content: string; created_at?: string; messageType?: string;
   metadata?: ChatMetadata; attachments?: { name: string; type: string; size: number }[];
   onSavePlan?: (id: number, answers: Record<string, string>) => void; onApprovePlan?: (id: number) => void; onOpenPlan?: (id: number) => void;
+  onOpenFile?: (path: string) => void;
 }
 
 const MAX_CHARS = 400;
@@ -27,16 +28,17 @@ const boxBase = 'mt-3 overflow-hidden rounded-lg border border-white/[.09] bg-[#
 const boxHeader = 'flex items-center gap-2 border-b border-white/[.06] px-3 py-2';
 const boxTitle = 'text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300';
 
-export function FilesChangedBox({ files, created, edited }: { files?: { path: string; size?: number }[]; created?: string[]; edited?: string[] }) {
+export function FilesChangedBox({ files, created, edited, onOpenFile }: { files?: { path: string; size?: number }[]; created?: string[]; edited?: string[]; onOpenFile?: (path: string) => void }) {
   const createdPaths = created && created.length > 0 ? created : (files || []).map(f => f.path);
   const editedPaths = edited || [];
-  const list = (paths: string[], color: string, prefix: string) => paths.length > 0 && <div className="flex flex-wrap gap-1">{paths.slice(0, 20).map((p, i) => <span key={i} className="flex max-w-[220px] items-center gap-1 rounded border border-white/[.06] bg-white/[.025] px-1.5 py-1 text-[10px] text-zinc-400"><FileCode className="h-3 w-3 shrink-0" /><span className={`truncate ${color}`}>{p}</span></span>)}</div>;
+  const chip = (p: string, color: string) => <button key={p} type="button" onClick={() => onOpenFile?.(p)} title={p} className="flex max-w-[260px] items-center gap-1 rounded border border-white/[.06] bg-white/[.025] px-1.5 py-1 text-[10px] text-zinc-400 transition-colors hover:border-sky-400/40 hover:bg-sky-400/[.06]"><FileCode className="h-3 w-3 shrink-0" /><span className={`truncate ${color}`}>{p}</span></button>;
+  const list = (paths: string[], color: string) => paths.length > 0 && <div className="flex flex-wrap gap-1">{paths.slice(0, 20).map(p => chip(p, color))}</div>;
   if (!files?.length && !createdPaths.length && !editedPaths.length) return null;
   return <div className={boxBase}>
     <div className={boxHeader}><FileCode className="h-3.5 w-3.5 text-emerald-400" /><span className={boxTitle}>Files changed</span><span className="text-[10px] text-zinc-500">{(createdPaths.length + editedPaths.length)} file{(createdPaths.length + editedPaths.length) === 1 ? '' : 's'}</span></div>
     <div className="space-y-2 px-3 py-2">
-      {createdPaths.length > 0 && <div><div className="mb-1 text-[9px] font-semibold uppercase tracking-[.12em] text-emerald-500/70">Created</div>{list(createdPaths, 'text-emerald-300', '+')}</div>}
-      {editedPaths.length > 0 && <div><div className="mb-1 text-[9px] font-semibold uppercase tracking-[.12em] text-amber-500/70">Edited</div>{list(editedPaths, 'text-amber-300', '~')}</div>}
+      {createdPaths.length > 0 && <div><div className="mb-1 text-[9px] font-semibold uppercase tracking-[.12em] text-emerald-500/70">Created</div>{list(createdPaths, 'text-emerald-300')}</div>}
+      {editedPaths.length > 0 && <div><div className="mb-1 text-[9px] font-semibold uppercase tracking-[.12em] text-amber-500/70">Edited</div>{list(editedPaths, 'text-amber-300')}</div>}
     </div>
   </div>;
 }
@@ -79,7 +81,7 @@ export function DownloadsBox({ downloads }: { downloads?: { url: string; path: s
   </div>;
 }
 
-export function ChatMessage({ id, role, content, created_at, messageType = 'message', metadata = {}, attachments, onSavePlan, onApprovePlan, onOpenPlan }: Props) {
+export function ChatMessage({ id, role, content, created_at, messageType = 'message', metadata = {}, attachments, onSavePlan, onApprovePlan, onOpenPlan, onOpenFile }: Props) {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>(metadata.answers || {});
   const [custom, setCustom] = useState<Record<string, string>>({});
@@ -104,7 +106,7 @@ export function ChatMessage({ id, role, content, created_at, messageType = 'mess
       {messageType === 'plan' && <button onClick={() => id && onOpenPlan?.(id)} className="mb-2 flex items-center gap-1.5 text-left text-[11px] text-sky-300 hover:text-sky-200"><FileText className="h-3.5 w-3.5" />Open plan.md — {metadata.plan?.title || 'Project plan'}</button>}
       <TruncatedContent text={content} />
       {messageType === 'build' && <>
-        <FilesChangedBox files={metadata.files} created={metadata.created} edited={metadata.edited} />
+        <FilesChangedBox files={metadata.files} created={metadata.created} edited={metadata.edited} onOpenFile={onOpenFile} />
         <SearchBox search={metadata.search} />
         <DocsBox docs={metadata.docs} />
         <CommandsBox commands={metadata.commands} />
