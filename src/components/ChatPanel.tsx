@@ -41,6 +41,7 @@ interface ChatPanelProps {
     onPromptSubmit?: (prompt: string) => void;
     initialPrompt?: string | null;
     onInitialPromptHandled?: () => void;
+    initialPromptForceBuild?: boolean;
     highlight?: string;
     modelDropdown?: React.ReactNode;
     typeDropdown?: React.ReactNode;
@@ -127,6 +128,7 @@ export const ChatPanel = ({
     onDownloadArtifact,
     initialPrompt,
     onInitialPromptHandled,
+    initialPromptForceBuild,
     onPlanCreated,
     onOpenPlanFile
 }: ChatPanelProps) => {
@@ -370,7 +372,7 @@ export const ChatPanel = ({
             autoSubmittedPromptRef.current = initialPrompt;
             setPrompt(initialPrompt);
             setTimeout(() => {
-                handleSend(initialPrompt);
+                handleSend(initialPrompt, initialPromptForceBuild);
                 if (onInitialPromptHandled) onInitialPromptHandled();
             }, 100);
         }
@@ -421,7 +423,7 @@ export const ChatPanel = ({
         }
     };
 
-    const handleSend = async (messageOverride?: string) => {
+    const handleSend = async (messageOverride?: string, forceBuild?: boolean) => {
         const userMsg = messageOverride || prompt.trim();
         if ((!userMsg && attachedFiles.length === 0) || loading) return;
 
@@ -476,7 +478,7 @@ export const ChatPanel = ({
             return [...prev, { role: 'user', content: userMsg, attachments: attachments.length > 0 ? attachments : undefined }];
         });
 
-        if (execMode === 'plan') {
+        if (execMode === 'plan' && !forceBuild) {
             setStatusLog([{ message: 'Analyzing request parameters & goals...', type: 'pending' }]);
             try {
                 if (!sessionId) throw new Error('Create or open a project before planning.');
@@ -528,11 +530,11 @@ export const ChatPanel = ({
             return;
         }
 
-        runBuildGeneration(finalPrompt);
+        runBuildGeneration(finalPrompt, undefined, forceBuild);
     };
 
-    const runBuildGeneration = async (finalPromptOverride?: string, approvedPlanId?: number) => {
-        const effectiveChatMode = execMode === 'chat' || chatMode;
+    const runBuildGeneration = async (finalPromptOverride?: string, approvedPlanId?: number, forceBuild?: boolean) => {
+        const effectiveChatMode = forceBuild ? false : (execMode === 'chat' || chatMode);
         const userMsg = messages[messages.length - 1]?.content || prompt;
         let finalPrompt = finalPromptOverride || userMsg;
 
@@ -878,6 +880,7 @@ export const ChatPanel = ({
         setPlanningData({ plan: planMessage?.metadata?.plan || planMessage?.planData, questions: planMessage?.metadata?.questions || [] });
         setSelectedAnswers(answers);
         setPlanApproved(true);
+        setExecMode('build');
         await runBuildGeneration(planPrompt || messages.filter(message => message.role === 'user').slice(-1)[0]?.content || '', messageId > 0 ? messageId : undefined);
     };
 

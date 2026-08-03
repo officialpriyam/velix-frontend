@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { File, Folder, ChevronRight, ChevronDown, Plus, Trash2, Edit2, FolderPlus, Upload, Download, ArchiveRestore, FileArchive, Loader2 } from 'lucide-react';
+import { File, Folder, ChevronRight, ChevronDown, Plus, Trash2, Edit2, FolderPlus, Upload, Download, ArchiveRestore, FileArchive, Loader2, RefreshCw } from 'lucide-react';
 import { fileApi } from '@/lib/api';
 
 interface FileTreeProps {
@@ -36,6 +36,7 @@ export const FileTree = ({
 }: FileTreeProps) => {
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['root']));
     const [uploading, setUploading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     const treeData = useMemo(() => {
@@ -239,6 +240,17 @@ export const FileTree = ({
                         title="New Folder"
                     >
                         <FolderPlus className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        onClick={async () => {
+                            if (!onRefresh || refreshing) return;
+                            setRefreshing(true);
+                            try { onRefresh(); } finally { setTimeout(() => setRefreshing(false), 800); }
+                        }}
+                        className="p-1.5 hover:bg-[hsl(var(--surface-sunk))] rounded-lg text-muted hover:text-primary transition-all"
+                        title="Refresh Files"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
                     </button>
                 </div>
             </div>

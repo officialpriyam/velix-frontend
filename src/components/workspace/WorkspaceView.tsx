@@ -118,6 +118,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
     const [platform, setPlatform] = useState(incomingPlatform || sessionPrefs.platform || savedPrefs.platform || 'minecraft');
     const [category, setCategory] = useState(incomingCategory || sessionPrefs.category || savedPrefs.category || 'plugins');
     const [initialPrompt, setInitialPrompt] = useState<string | null>(incomingPrompt);
+    const [autoFixPrompt, setAutoFixPrompt] = useState(false);
     const [model, setModel] = useState<string>(incomingModel || 'priyx-ultra');
     const [modelTiers, setModelTiers] = useState<{
         lite: { name: string; description: string; models: any[] };
@@ -513,6 +514,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
 
     const handleAutoFix = (error: string) => {
         setBuildResult(null);
+        setAutoFixPrompt(true);
         const fileContext = Object.entries(files)
             .filter(([path, content]) => content && !path.endsWith('/'))
             .slice(0, 10)
@@ -526,6 +528,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
 
     const handleBotFix = (error: string) => {
         setActiveModal(null);
+        setAutoFixPrompt(true);
         const fileContext = Object.entries(files)
             .filter(([path, content]) => content && !path.endsWith('/'))
             .slice(0, 10)
@@ -724,7 +727,8 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                             />
                         }
                         initialPrompt={initialPrompt}
-                        onInitialPromptHandled={() => setInitialPrompt(null)}
+                        initialPromptForceBuild={autoFixPrompt}
+                        onInitialPromptHandled={() => { setInitialPrompt(null); setAutoFixPrompt(false); }}
                         highlight={highlight}
                         buildResult={buildResult}
                         compiling={compiling}

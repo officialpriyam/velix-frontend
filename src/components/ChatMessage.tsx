@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, Check, ChevronLeft, ChevronRight, FileCode, FileText, Loader2, Sparkles } from 'lucide-react';
+import { Bot, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, FileCode, FileText, Loader2, Sparkles } from 'lucide-react';
 
 export interface QuestionItem { id: string; question: string; options: string[]; }
 export interface PlanData { title: string; summary: string; components?: { name: string; desc: string }[]; designDirection?: string[]; }
@@ -9,6 +9,18 @@ interface Props {
   id?: number; role: 'user' | 'assistant'; content: string; created_at?: string; messageType?: string;
   metadata?: ChatMetadata; attachments?: { name: string; type: string; size: number }[];
   onSavePlan?: (id: number, answers: Record<string, string>) => void; onApprovePlan?: (id: number) => void; onOpenPlan?: (id: number) => void;
+}
+
+const MAX_CHARS = 400;
+
+function TruncatedContent({ text, className }: { text: string; className?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > MAX_CHARS;
+  const display = isLong && !expanded ? text.slice(0, MAX_CHARS) + '…' : text;
+  return <div>
+    <p className={`whitespace-pre-wrap text-[12px] leading-5 ${className || 'text-zinc-300'}`}>{display}</p>
+    {isLong && <button onClick={() => setExpanded(!expanded)} className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-sky-300 transition-colors">{expanded ? <><ChevronUp className="h-3.5 w-3.5" />Show less</> : <><ChevronDown className="h-3.5 w-3.5" />Show more</>}</button>}
+  </div>;
 }
 
 export function ChatMessage({ id, role, content, created_at, messageType = 'message', metadata = {}, attachments, onSavePlan, onApprovePlan, onOpenPlan }: Props) {
@@ -21,7 +33,7 @@ export function ChatMessage({ id, role, content, created_at, messageType = 'mess
   if (messageType === 'timeline') return null;
   if (role === 'user') return <div className="my-4 flex items-start gap-2.5 px-5 animate-in fade-in slide-in-from-bottom-1 duration-200">
     <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-zinc-700 text-[9px] font-bold text-zinc-200">YOU</div>
-    <div className="min-w-0 pt-0.5 text-[12px] leading-5 text-zinc-200"><p className="whitespace-pre-wrap">{content}</p>
+    <div className="min-w-0 pt-0.5 text-[12px] leading-5 text-zinc-200"><TruncatedContent text={content} className="text-zinc-200" />
       {attachments?.length ? <div className="mt-2 flex flex-wrap gap-1">{attachments.map((file, i) => <span key={i} className="rounded border border-white/10 bg-white/[.03] px-2 py-1 text-[10px] text-zinc-400">{file.name}</span>)}</div> : null}
     </div>
   </div>;
@@ -34,7 +46,7 @@ export function ChatMessage({ id, role, content, created_at, messageType = 'mess
       <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold text-zinc-400">Velix <span className="font-normal text-zinc-600">{created_at ? new Date(created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'now'}</span></div>
       {messageType === 'build' && <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold text-emerald-400"><Check className="h-3.5 w-3.5" />Generation complete</div>}
       {messageType === 'plan' && <button onClick={() => id && onOpenPlan?.(id)} className="mb-2 flex items-center gap-1.5 text-left text-[11px] text-sky-300 hover:text-sky-200"><FileText className="h-3.5 w-3.5" />Open plan.md — {metadata.plan?.title || 'Project plan'}</button>}
-      <p className="whitespace-pre-wrap text-[12px] leading-5 text-zinc-300">{content}</p>
+      <TruncatedContent text={content} />
       {metadata.files?.length ? <div className="mt-3 flex flex-wrap gap-1">{metadata.files.slice(0, 8).map((file, i) => <span key={i} className="flex items-center gap-1 rounded border border-white/[.06] bg-white/[.025] px-1.5 py-1 text-[10px] text-zinc-400"><FileCode className="h-3 w-3" />{file.path}</span>)}</div> : null}
 
       {messageType === 'plan' && question && status === 'awaiting_answers' && <div className="mt-3 rounded-lg border border-white/10 bg-[#11161d] p-3">
