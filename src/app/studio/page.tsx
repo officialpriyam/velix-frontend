@@ -143,11 +143,17 @@ export default function StudioPage() {
 
                 {/* Hero */}
                 <div className="text-center mb-10">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-400 mb-4">
+                        Beta
+                    </span>
                     <h1 className="text-4xl md:text-5xl font-extrabold mb-3 tracking-tight">
                         Imagine it. <span className="text-foreground/40">Generate it.</span>
                     </h1>
                     <p className="text-sm text-muted max-w-md mx-auto">
                         Turn your ideas into Minecraft textures, 3D models, and schematics with AI.
+                    </p>
+                    <p className="text-xs text-amber-400/90 max-w-md mx-auto mt-4 leading-relaxed">
+                        This page is in beta. It can break, and the AI may generate broken or incorrect results. Use at your own risk — results are not guaranteed.
                     </p>
                 </div>
 
