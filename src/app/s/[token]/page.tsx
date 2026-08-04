@@ -46,7 +46,7 @@ export default function SharedProjectPage() {
                 <div className="text-center">
                     <Lock className="w-12 h-12 text-muted mx-auto mb-4" />
                     <p className="text-sm text-muted">{error}</p>
-                    <button onClick={() => router.push('/')} className="mt-4 px-4 py-2 text-xs font-bold bg-foreground text-background rounded-lg">
+                    <button onClick={() => router.push('/chat')} className="mt-4 px-4 py-2 text-xs font-bold bg-foreground text-background rounded-lg">
                         Go Home
                     </button>
                 </div>
@@ -63,7 +63,7 @@ export default function SharedProjectPage() {
                 {/* Header */}
                 <header className="h-12 flex items-center justify-between px-4 border-b border-white/5 bg-background/80 backdrop-blur-xl shrink-0">
                     <div className="flex items-center gap-3">
-                        <button onClick={() => router.push('/')} className="p-1.5 rounded-lg hover:bg-[hsl(var(--surface-sunk))] text-muted hover:text-foreground transition-all">
+                        <button onClick={() => router.push('/chat')} className="p-1.5 rounded-lg hover:bg-[hsl(var(--surface-sunk))] text-muted hover:text-foreground transition-all">
                             <ArrowLeft className="w-4 h-4" />
                         </button>
                         <div className="flex items-center gap-2">

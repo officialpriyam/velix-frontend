@@ -31,7 +31,7 @@ export default function CreditsPage() {
                 if (profileResult.user) {
                     setUser(profileResult.user);
                 } else {
-                    router.push('/');
+                    router.push('/chat');
                     return;
                 }
 
@@ -40,7 +40,7 @@ export default function CreditsPage() {
                     setTransactions(creditsResult.transactions);
                 }
             } catch (err) {
-                router.push('/');
+                router.push('/chat');
             } finally {
                 setLoading(false);
             }

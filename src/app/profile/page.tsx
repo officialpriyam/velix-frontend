@@ -112,7 +112,7 @@ function ProfileContent() {
                     <p className="text-foreground/40 text-xs mb-6 leading-relaxed">
                         {error || "We couldn't retrieve profile details for this ID."}
                     </p>
-                    <Link href="/" className="inline-flex px-5 py-2 text-xs font-bold text-foreground border border-[hsl(var(--surface-sunk))] rounded-full hover:border-[hsl(var(--text)/0.5)] transition-all">
+                    <Link href="/chat" className="inline-flex px-5 py-2 text-xs font-bold text-foreground border border-[hsl(var(--surface-sunk))] rounded-full hover:border-[hsl(var(--text)/0.5)] transition-all">
                         Back to Home
                     </Link>
                 </div>

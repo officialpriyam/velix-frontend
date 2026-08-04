@@ -47,6 +47,7 @@ import { Editor } from '@/components/Editor';
 import { useNotification } from '@/components/Notification';
 import { WikiModal } from '@/components/WikiModal';
 import { BotConsole } from '@/components/BotConsole';
+import { showConfirm } from '@/components/ConfirmDialog';
 
 interface WorkspaceViewProps {
     sessionId: string;
@@ -479,7 +480,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
     };
 
     const handleDeletePath = async (path: string) => {
-        if (!sessionId || !confirm(`Delete ${path}?`)) return;
+        if (!sessionId || !await showConfirm({ title: 'Delete file', message: `Delete ${path}?`, danger: true })) return;
         try {
             await fileApi.delete(sessionId, path);
             setFiles(prev => {
@@ -638,7 +639,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
     };
 
     const handleRestoreVersion = async (versionId: number) => {
-        if (!confirm('Restore files to this version? Current changes will be overwritten.')) return;
+        if (!await showConfirm({ title: 'Restore version', message: 'Restore files to this version? Current changes will be overwritten.', danger: true })) return;
         setRestoring(versionId);
         try {
             const result = await versionsApi.restore(sessionId, versionId);
@@ -690,7 +691,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
     }, [sessionId]);
 
     const handleDepDelete = async (depId: number) => {
-        if (!confirm('Remove this dependency?')) return;
+        if (!await showConfirm({ title: 'Remove dependency', message: 'Remove this dependency?', danger: true })) return;
         try {
             await dependenciesApi.remove(sessionId, depId);
             showNotification('Dependency removed.', 'success');

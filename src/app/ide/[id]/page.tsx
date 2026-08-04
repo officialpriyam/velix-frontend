@@ -31,9 +31,9 @@ export default function IdePage() {
         authApi.me()
             .then((res: any) => {
                 if (res.user) setUser(res.user);
-                else router.push('/');
+                else router.push('/chat');
             })
-            .catch(() => { router.push('/'); });
+            .catch(() => { router.push('/chat'); });
     }, []);
 
     // Check project access
@@ -58,7 +58,7 @@ export default function IdePage() {
     const handleLogout = async () => {
         await authApi.logout();
         setUser(null);
-        router.push('/');
+        router.push('/chat');
     };
 
     if (!id) return null;
@@ -68,7 +68,7 @@ export default function IdePage() {
             <main className="flex h-screen bg-background text-foreground items-center justify-center">
                 <div className="text-center">
                     <p className="text-sm text-muted mb-4">You don&apos;t have access to this project.</p>
-                    <button onClick={() => router.push('/')} className="px-4 py-2 text-xs font-bold bg-foreground text-background rounded-lg">
+                    <button onClick={() => router.push('/chat')} className="px-4 py-2 text-xs font-bold bg-foreground text-background rounded-lg">
                         Go Home
                     </button>
                 </div>
@@ -93,7 +93,7 @@ export default function IdePage() {
                 <header className="h-12 flex items-center justify-between px-4 z-30 shrink-0 border-b border-white/5 bg-background/80 backdrop-blur-xl">
                     {/* Left: Back + session name */}
                     <div className="flex items-center gap-3">
-                        <button onClick={() => router.push('/')} className="p-1.5 rounded-lg hover:bg-[hsl(var(--surface-sunk))] text-muted hover:text-foreground transition-all" title="Back to home">
+                        <button onClick={() => router.push('/chat')} className="p-1.5 rounded-lg hover:bg-[hsl(var(--surface-sunk))] text-muted hover:text-foreground transition-all" title="Back to chat">
                             <ArrowLeft className="w-4 h-4" />
                         </button>
                     </div>
@@ -145,7 +145,7 @@ export default function IdePage() {
                 {/* ─── Workspace ─── */}
                 <WorkspaceView
                     sessionId={id as string}
-                    onExit={() => router.push('/')}
+                    onExit={() => router.push('/chat')}
                     initialPrompt={initialPrompt}
                     initialModel={initialModel}
                     initialLanguage={initialLanguage || undefined}

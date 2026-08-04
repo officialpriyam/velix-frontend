@@ -36,7 +36,7 @@ export function IconRail({ items }: { items: IconRailItem[] }) {
     return (
         <div className="w-16 shrink-0 flex flex-col items-center py-5 gap-2 glass-card z-20 relative">
             <Link
-                href="/"
+                href="/chat"
                 className="neu-raised w-11 h-11 flex items-center justify-center mb-3 hover:brightness-110 transition-all duration-300 active:scale-95 overflow-hidden"
             >
                 <img src="/logo.png" alt="Velix" className="h-full w-full object-cover" />
@@ -94,7 +94,7 @@ export function TopHeader({
     return (
         <header className="h-16 flex items-center justify-between px-8 z-30 shrink-0 relative bg-transparent">
             <div className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-                <Link href="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
+                <Link href="/chat" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
                     <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] shadow-lg shadow-[hsl(var(--text)/0.1)]">
                         <img src="/logo.png" alt="Velix" className="h-full w-full object-cover" />
                     </span>

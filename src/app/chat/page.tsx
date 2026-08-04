@@ -21,6 +21,7 @@ import { ModelSelector } from '@/components/ModelSelector';
 import { ProjectTypeModal } from '@/components/ProjectTypeModal';
 import { TopHeader, useAuth, SharedModals, Footer, cn } from '@/components/AppShell';
 import { fileApi, aiApi } from '@/lib/api';
+import { showConfirm } from '@/components/ConfirmDialog';
 
 const projectTypeLabels: { [key: string]: string } = {
     'java': 'Java Plugin',
@@ -111,7 +112,7 @@ function ChatContent() {
 
     const handleDeleteProject = async (e: React.MouseEvent, projectId: string) => {
         e.stopPropagation();
-        if (!confirm("Delete this project?")) return;
+        if (!await showConfirm({ title: 'Delete project', message: 'Delete this project?', danger: true })) return;
         try {
             await aiApi.deleteProject(projectId);
             setProjects(prev => prev.filter(p => p.id !== projectId));

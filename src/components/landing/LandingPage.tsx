@@ -365,7 +365,7 @@ export default function LandingPage() {
 
         {/* Nav */}
         <header className="relative z-20 mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <a href="/" className="flex items-center gap-2">
+          <a href="/chat" className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center">
               <svg viewBox="0 0 32 32" className="h-9 w-9" fill="none">
                 <path d="M6 6L16 26L26 6" stroke="#22d3ee" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>

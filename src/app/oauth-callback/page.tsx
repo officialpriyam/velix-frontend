@@ -26,7 +26,7 @@ export default function OAuthCallbackPage() {
         if (!accessToken) {
             setError('No access token found in URL');
             setStatus('Authentication failed');
-            const t = setTimeout(() => router.push('/'), 2000);
+            const t = setTimeout(() => router.push('/chat'), 2000);
             return () => clearTimeout(t);
         }
 
@@ -38,7 +38,7 @@ export default function OAuthCallbackPage() {
                     console.error('[OAuth] Backend error:', result.error);
                     setError(result.error);
                     setStatus('Authentication failed');
-                    const t = setTimeout(() => router.push('/'), 2000);
+                    const t = setTimeout(() => router.push('/chat'), 2000);
                     return () => clearTimeout(t);
                 }
 
@@ -46,14 +46,14 @@ export default function OAuthCallbackPage() {
 
                 // Small delay to ensure cookie is propagated through proxy
                 setTimeout(() => {
-                    window.location.href = '/';
+                    window.location.href = '/chat';
                 }, 300);
             })
             .catch((err) => {
                 console.error('[OAuth] Request failed:', err);
                 setError('Failed to authenticate with server');
                 setStatus('Authentication failed');
-                const t = setTimeout(() => router.push('/'), 2000);
+                const t = setTimeout(() => router.push('/chat'), 2000);
                 return () => clearTimeout(t);
             });
     }, [router]);

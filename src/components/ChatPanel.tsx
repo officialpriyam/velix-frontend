@@ -6,6 +6,7 @@ import { ModelSelector } from './ModelSelector';
 import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square, Globe, Brain, Eye, ChevronDown, TerminalSquare } from 'lucide-react';
 import { aiApi, copyToClipboard } from '../lib/api';
 import { useNotification } from './Notification';
+import { showConfirm } from './ConfirmDialog';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
 
@@ -1084,7 +1085,7 @@ export const ChatPanel = ({
     return (
         <div className="relative flex-1 flex flex-col h-full overflow-hidden">
             <div className="flex items-center justify-end gap-2 px-3 py-2 border-b border-white/5">
-                <button onClick={async () => { if (sessionId && window.confirm('Clear this project conversation? This cannot be undone.')) { const result = await aiApi.clearMessages(sessionId); if (!result.error) { setMessages([]); setPlanningData(null); } } }} className="rounded-lg px-2 py-1 text-[10px] text-zinc-500 hover:text-red-300">Clear</button>
+                <button onClick={async () => { if (sessionId && await showConfirm({ title: 'Clear conversation', message: 'Clear this project conversation? This cannot be undone.', danger: true })) { const result = await aiApi.clearMessages(sessionId); if (!result.error) { setMessages([]); setPlanningData(null); } } }} className="rounded-lg px-2 py-1 text-[10px] text-zinc-500 hover:text-red-300">Clear</button>
             </div>
             <div ref={scrollRef} className="flex-1 overflow-y-auto mb-2 space-y-2">
                 {messages.length === 0 && statusLog.length === 0 && !buildResult && (
@@ -1102,7 +1103,7 @@ export const ChatPanel = ({
                 )}
                 {!loading && <AgentActivityTimeline logs={statusLog} loading={false} />}
                 {/* Legacy source pills are retained only for backwards-compatible DOM styling. */}
-                {false && (searchStatus?.queries.length || 0) > 0 && (
+                {(searchStatus?.queries.length || 0) > 0 && (
                     <div className="mx-2 mb-2 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 animate-in fade-in duration-200">
                         <div className="flex items-center gap-2 mb-2">
                             <Globe className="w-3.5 h-3.5 text-blue-400" />

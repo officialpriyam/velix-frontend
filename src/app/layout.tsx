@@ -128,6 +128,7 @@ export default function RootLayout({
           <NotificationProvider>
             <AuthProvider>
               <SiteAccessGate>{children}</SiteAccessGate>
+              <ConfirmManager />
             </AuthProvider>
           </NotificationProvider>
         </ThemeProvider>
@@ -140,3 +141,4 @@ import { NotificationProvider } from "@/components/Notification";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/lib/AuthContext";
 import { SiteAccessGate } from "@/components/SiteAccessGate";
+import { ConfirmManager } from "@/components/ConfirmDialog";

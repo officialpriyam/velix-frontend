@@ -137,7 +137,7 @@ export default function StudioPage() {
         <div className="min-h-screen bg-background text-foreground">
             <div className="max-w-5xl mx-auto px-6 py-10">
                 {/* Back */}
-                <Link href="/" className="inline-flex items-center gap-2 text-xs text-muted hover:text-foreground transition-colors mb-8">
+                <Link href="/chat" className="inline-flex items-center gap-2 text-xs text-muted hover:text-foreground transition-colors mb-8">
                     <ArrowLeft className="w-3 h-3" /> Back to Home
                 </Link>
 

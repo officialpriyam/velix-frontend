@@ -12,6 +12,7 @@ import { authApi, copyToClipboard } from '@/lib/api';
 import { MatrixRain } from '@/components/MatrixRain';
 import { TopHeader, useAuth, SharedModals } from '@/components/AppShell';
 import { useTheme } from '@/components/ThemeProvider';
+import { showConfirm } from '@/components/ConfirmDialog';
 
 type SectionId = 'profile' | 'account' | 'api-keys' | 'affiliate' | 'preferences' | 'appearance' | 'danger';
 
@@ -70,11 +71,11 @@ export default function SettingsPage() {
                     setEmailNotifs(res.user.email_notifications === 1);
                     setPasteAsFile(res.user.paste_as_file === 1);
                 } else {
-                    router.push('/');
+                    router.push('/chat');
                 }
             } catch (err) {
                 console.error("Failed to load user settings:", err);
-                router.push('/');
+                router.push('/chat');
             } finally {
                 setLoading(false);
             }
@@ -145,7 +146,7 @@ export default function SettingsPage() {
 
     const handleDeleteAccount = async () => {
         if (!user?.id) return;
-        if (!confirm("WARNING: Are you sure you want to delete your account permanently? This action is irreversible and all your sandboxes will be cleaned up.")) return;
+        if (!await showConfirm({ title: 'Delete account', message: 'WARNING: Are you sure you want to delete your account permanently? This action is irreversible and all your sandboxes will be cleaned up.', danger: true })) return;
         try {
             const res = await fetch(`/api/admin/users/${user.id}`, {
                 method: 'DELETE',
@@ -154,7 +155,7 @@ export default function SettingsPage() {
             const result = await res.json();
             if (result.success) {
                 await logout();
-                router.push('/');
+                router.push('/chat');
             }
         } catch (err) {
             alert("Failed to delete account. Support team notified.");
