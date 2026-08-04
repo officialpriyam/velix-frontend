@@ -34,6 +34,7 @@ export interface BuildResult {
 interface ChatPanelProps {
     sessionId?: string | null;
     onCodeGenerated: (sessionId: string, aiResponse: any) => void;
+    onFileStream?: (file: { path: string; content: string }) => void;
     model?: string;
     language?: string;
     platform?: string;
@@ -112,6 +113,7 @@ function AgentActivityTimeline({ logs, loading }: { logs: { message: string; typ
 export const ChatPanel = ({
     sessionId,
     onCodeGenerated,
+    onFileStream,
     compact = false,
     onPromptSubmit,
     projectFiles,
@@ -752,6 +754,9 @@ export const ChatPanel = ({
                             edited: isNew ? prev.edited : [...prev.edited, ev.path]
                         };
                     });
+                    if (ev.content && onFileStream) {
+                        onFileStream({ path: ev.path, content: ev.content });
+                    }
                     logs.push({ message: `${isNew ? '+' : '~'} ${isNew ? 'Created' : 'Edited'} ${ev.path}`, type: 'done' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'command') {

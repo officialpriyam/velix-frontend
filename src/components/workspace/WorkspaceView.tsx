@@ -717,9 +717,13 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
             {/* Left: Chat */}
             <div className="w-[380px] lg:w-[420px] flex flex-col border-r border-[hsl(var(--surface-sunk))] shrink-0">
                 <div className="flex-1 overflow-hidden">
-                    <ChatPanel
+<ChatPanel
                         sessionId={sessionId}
                         onCodeGenerated={handleCodeGenerated}
+                        onFileStream={(file) => {
+                            setFiles(prev => ({ ...prev, [file.path.replace(/\\/g, '/')]: file.content }));
+                            if (!selectedFile) setSelectedFile(file.path.replace(/\\/g, '/'));
+                        }}
                         onPlanCreated={(content) => {
                             setFiles(prev => ({ ...prev, 'plan.md': content }));
                             setSelectedFile('plan.md');
