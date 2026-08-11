@@ -110,11 +110,11 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] px-3 py-1.5 text-xs text-foreground/80 flex items-center gap-1.5 hover:text-foreground hover:bg-[hsl(var(--surface-sunk))]/80 transition-all shadow-sm font-medium relative z-50"
+                className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs text-foreground/80 flex items-center gap-1 hover:text-foreground hover:bg-[hsl(var(--surface-sunk))]/80 transition-all shadow-sm font-medium relative z-50"
             >
-                <Sparkles className="w-3.5 h-3.5 text-primary" />
-                <span className="truncate max-w-[130px]">{getDisplayName(selectedModel)}</span>
-                <ChevronDown className="w-3 h-3 text-muted" />
+                <Sparkles className="w-3 h-3 md:w-3.5 md:h-3.5 text-primary" />
+                <span className="truncate max-w-[70px] md:max-w-[130px]">{getDisplayName(selectedModel)}</span>
+                <ChevronDown className="w-2.5 h-2.5 md:w-3 md:h-3 text-muted" />
             </button>
 
             {isOpen && (

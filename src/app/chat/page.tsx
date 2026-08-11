@@ -146,7 +146,7 @@ function ChatContent() {
     ];
 
     return (
-        <main className="flex flex-col min-h-screen bg-background text-foreground overflow-hidden font-sans relative">
+        <main className="flex flex-col min-h-screen bg-background text-foreground overflow-hidden overflow-x-hidden font-sans relative">
             {/* Campfire video background */}
             <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
                 <video
@@ -170,7 +170,7 @@ function ChatContent() {
             <TopHeader user={user} onLogout={logout} onLoginClick={() => auth.setIsAuthOpen(true)} />
 
             {view === 'home' ? (
-                <div className="flex-1 flex flex-col items-center justify-between animate-fade-in-up overflow-y-auto">
+                <div className="flex-1 flex flex-col items-center justify-between animate-fade-in-up overflow-y-auto overflow-x-hidden">
                     {/* Center content */}
                     <div className="flex-1 flex flex-col items-center justify-center w-full px-4 md:px-6 max-w-3xl mx-auto">
                         {/* Greeting */}

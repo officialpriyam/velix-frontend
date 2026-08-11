@@ -104,13 +104,13 @@ export function TopHeader({
     }, [showMobileMenu]);
 
     return (
-        <header className="h-14 md:h-16 flex items-center justify-between px-4 md:px-8 z-30 shrink-0 relative bg-transparent">
-            <div className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-                <Link href="/chat" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-                    <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] shadow-lg shadow-[hsl(var(--text)/0.1)]">
+        <header className="h-12 md:h-16 flex items-center justify-between px-3 md:px-8 z-30 shrink-0 relative bg-transparent">
+            <div className="flex items-center gap-2 hover:opacity-90 transition-opacity shrink-0">
+                <Link href="/chat" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+                    <span className="inline-flex h-7 w-7 md:h-8 md:w-8 items-center justify-center overflow-hidden rounded-xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] shadow-lg shadow-[hsl(var(--text)/0.1)]">
                         <img src="/logo.png" alt="Velix" className="h-full w-full object-cover" />
                     </span>
-                    <span className="font-extrabold text-foreground text-lg tracking-tight">Velix</span>
+                    <span className="font-extrabold text-foreground text-base md:text-lg tracking-tight">Velix</span>
                 </Link>
             </div>
 
@@ -152,7 +152,7 @@ export function TopHeader({
                 </div>
             </nav>
 
-            <div className="flex items-center gap-2 md:gap-4">
+            <div className="flex items-center gap-1.5 md:gap-4 shrink-0">
                 <ThemeToggle />
                 {user ? (
                     <>
@@ -167,14 +167,13 @@ export function TopHeader({
                             <button
                                 onClick={() => setShowUserMenu(!showUserMenu)}
                                 onBlur={() => setTimeout(() => setShowUserMenu(false), 200)}
-                                className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                                className="flex items-center gap-1 hover:opacity-80 transition-opacity"
                             >
-                                <div className="w-8 h-8 rounded-full overflow-hidden border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))]">
+                                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full overflow-hidden border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))]">
                                     <img src="/avatar.png" alt="Profile" className="h-full w-full object-cover" onError={(e) => {
                                         (e.target as HTMLElement).style.display = 'none';
                                     }} />
                                 </div>
-                                <ChevronDown className="w-3 h-3 text-foreground/40 hidden sm:block" />
                             </button>
                             {showUserMenu && (
                                 <div className="absolute top-full right-0 mt-2 w-48 rounded-xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] p-1.5 shadow-xl z-50 animate-scale-in">

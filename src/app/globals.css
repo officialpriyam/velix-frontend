@@ -620,3 +620,22 @@ body {
 .safe-area-top {
   padding-top: env(safe-area-inset-top, 0px);
 }
+
+/* ===== Mobile global fixes ===== */
+html, body {
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent horizontal overflow on all containers */
+* {
+  box-sizing: border-box;
+}
+
+/* Better touch targets on mobile */
+@media (max-width: 768px) {
+  button, a, [role="button"] {
+    min-height: 32px;
+    min-width: 32px;
+  }
+}

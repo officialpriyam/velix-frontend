@@ -1411,7 +1411,7 @@ export const ChatPanel = ({
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={loading || attachedFiles.length >= MAX_FILES}
-                            className={`p-1.5 rounded-lg transition-all ${loading || attachedFiles.length >= MAX_FILES
+                            className={`p-1 md:p-1.5 rounded-lg transition-all ${loading || attachedFiles.length >= MAX_FILES
                                 ? 'text-faint'
                                 : 'text-muted hover:text-primary active:scale-95'
                                 }`}
@@ -1421,7 +1421,7 @@ export const ChatPanel = ({
                         </button>
                         <button
                             onClick={() => setEnableWebSearch(!enableWebSearch)}
-                            className={`p-1.5 rounded-lg transition-all ${enableWebSearch
+                            className={`p-1 md:p-1.5 rounded-lg transition-all ${enableWebSearch
                                 ? 'text-blue-400 bg-blue-500/10 border border-blue-500/30'
                                 : 'text-muted hover:text-primary active:scale-95'
                                 }`}
@@ -1430,7 +1430,7 @@ export const ChatPanel = ({
                             <Globe className="w-3.5 h-3.5" />
                         </button>
                         {attachedFiles.some(f => f.type.startsWith('image/')) && (
-                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px]">
+                            <div className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px]">
                                 <Eye className="w-2.5 h-2.5" />
                                 <span>{attachedFiles.filter(f => f.type.startsWith('image/')).length}</span>
                             </div>
@@ -1438,7 +1438,7 @@ export const ChatPanel = ({
                         <button
                             onClick={handleEnhance}
                             disabled={loading || !prompt.trim()}
-                            className={`p-1.5 rounded-lg transition-all ${loading || !prompt.trim()
+                            className={`hidden sm:block p-1 md:p-1.5 rounded-lg transition-all ${loading || !prompt.trim()
                                 ? 'text-faint'
                                 : 'text-muted hover:text-primary active:scale-95'
                                 }`}
@@ -1449,7 +1449,7 @@ export const ChatPanel = ({
                         <button
                             onClick={loading ? handleStop : () => handleSend()}
                             disabled={!loading && (!prompt.trim() && attachedFiles.length === 0)}
-                            className={`p-1.5 rounded-lg transition-all ${loading
+                            className={`p-1 md:p-1.5 rounded-lg transition-all ${loading
                                 ? 'bg-red-500 text-white hover:bg-red-600 active:scale-95'
                                 : (!prompt.trim() && attachedFiles.length === 0)
                                     ? 'text-faint bg-[hsl(var(--surface-sunk))]'
