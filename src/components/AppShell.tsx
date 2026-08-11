@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
     LogOut,
     ChevronDown,
     Coins,
+    Menu,
+    X,
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -77,7 +79,7 @@ function RailButton({ icon: Icon, label, href, active, onClick }: IconRailItem) 
 
 /**
  * The top header bar with brand, nav links, credit pill, and user menu.
- * Shared across all non-IDE pages.
+ * Shared across all non-IDE pages. Responsive: mobile gets hamburger menu.
  */
 export function TopHeader({
     user,
@@ -90,9 +92,19 @@ export function TopHeader({
 }) {
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [showMoreMenu, setShowMoreMenu] = useState(false);
+    const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+    useEffect(() => {
+        if (showMobileMenu) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => { document.body.style.overflow = ''; };
+    }, [showMobileMenu]);
 
     return (
-        <header className="h-16 flex items-center justify-between px-8 z-30 shrink-0 relative bg-transparent">
+        <header className="h-14 md:h-16 flex items-center justify-between px-4 md:px-8 z-30 shrink-0 relative bg-transparent">
             <div className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
                 <Link href="/chat" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
                     <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] shadow-lg shadow-[hsl(var(--text)/0.1)]">
@@ -102,6 +114,7 @@ export function TopHeader({
                 </Link>
             </div>
 
+            {/* Desktop nav */}
             <nav className="hidden md:flex items-center gap-6 text-sm font-medium absolute left-1/2 -translate-x-1/2">
                 <Link href="/community" className="text-foreground/50 hover:text-foreground transition-all duration-300 hover:scale-105">
                     Community
@@ -139,13 +152,13 @@ export function TopHeader({
                 </div>
             </nav>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
                 <ThemeToggle />
                 {user ? (
                     <>
                         <Link
                             href="/credits"
-                            className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] px-3 py-1 flex items-center gap-1.5 text-xs text-foreground/70 hover:text-foreground transition-all font-semibold"
+                            className="hidden sm:flex rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] px-3 py-1 items-center gap-1.5 text-xs text-foreground/70 hover:text-foreground transition-all font-semibold"
                         >
                             <Coins className="w-3.5 h-3.5 text-foreground/50" />
                             <span>{user.credits !== undefined ? user.credits : 0}</span>
@@ -161,7 +174,7 @@ export function TopHeader({
                                         (e.target as HTMLElement).style.display = 'none';
                                     }} />
                                 </div>
-                                <ChevronDown className="w-3 h-3 text-foreground/40" />
+                                <ChevronDown className="w-3 h-3 text-foreground/40 hidden sm:block" />
                             </button>
                             {showUserMenu && (
                                 <div className="absolute top-full right-0 mt-2 w-48 rounded-xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] p-1.5 shadow-xl z-50 animate-scale-in">
@@ -188,12 +201,58 @@ export function TopHeader({
                 ) : (
                     <button
                         onClick={onLoginClick}
-                        className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] px-4 py-1.5 text-xs text-foreground/70 hover:text-foreground transition-all font-semibold"
+                        className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] px-3 md:px-4 py-1.5 text-xs text-foreground/70 hover:text-foreground transition-all font-semibold"
                     >
                         Sign In
                     </button>
                 )}
+
+                {/* Mobile hamburger */}
+                <button
+                    onClick={() => setShowMobileMenu(!showMobileMenu)}
+                    className="md:hidden p-2 rounded-lg hover:bg-[hsl(var(--surface-sunk))] text-muted hover:text-foreground transition-all"
+                >
+                    {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                </button>
             </div>
+
+            {/* Mobile slide-down menu */}
+            {showMobileMenu && (
+                <div className="md:hidden absolute top-full left-0 right-0 z-50 border-b border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))]/95 backdrop-blur-xl shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+                    <nav className="flex flex-col p-4 gap-1">
+                        <Link href="/community" onClick={() => setShowMobileMenu(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-foreground/70 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground transition-colors">
+                            Community
+                        </Link>
+                        <Link href="/images" onClick={() => setShowMobileMenu(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-foreground/70 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground transition-colors">
+                            Images
+                        </Link>
+                        <Link href="/studio" onClick={() => setShowMobileMenu(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-foreground/70 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground transition-colors">
+                            Studio
+                        </Link>
+                        <Link href="/pricing" onClick={() => setShowMobileMenu(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-foreground/70 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground transition-colors">
+                            Pricing
+                        </Link>
+                        <div className="border-t border-[hsl(var(--surface-sunk))] my-2" />
+                        <Link href="/credits" onClick={() => setShowMobileMenu(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-foreground/70 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground transition-colors">
+                            Credits History
+                        </Link>
+                        <Link href="/profile" onClick={() => setShowMobileMenu(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-foreground/70 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground transition-colors">
+                            My Profile
+                        </Link>
+                        <Link href="/settings" onClick={() => setShowMobileMenu(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-foreground/70 hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground transition-colors">
+                            Settings
+                        </Link>
+                        {user && (
+                            <>
+                                <div className="border-t border-[hsl(var(--surface-sunk))] my-2" />
+                                <button onClick={() => { setShowMobileMenu(false); onLogout(); }} className="px-4 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-500/10 transition-colors text-left flex items-center gap-2">
+                                    <LogOut className="w-4 h-4" /> Logout
+                                </button>
+                            </>
+                        )}
+                    </nav>
+                </div>
+            )}
         </header>
     );
 }
@@ -212,8 +271,8 @@ export function SharedModals({ auth, docs }: { auth: ReturnType<typeof useAuth>;
 
 export function Footer() {
     return (
-        <footer className="w-full max-w-6xl mx-auto px-6 py-6 border-t border-[hsl(var(--surface-sunk))]/30 flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] text-foreground/40 font-medium z-10 relative">
-            <div className="flex items-center gap-4">
+        <footer className="w-full max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-6 border-t border-[hsl(var(--surface-sunk))]/30 flex flex-col items-center justify-between gap-3 md:gap-4 text-[10px] text-foreground/40 font-medium z-10 relative">
+            <div className="flex items-center gap-3 md:gap-4 flex-wrap justify-center">
                 <Link href="/terms" className="hover:text-foreground/70 transition-colors">Terms</Link>
                 <Link href="/privacy" className="hover:text-foreground/70 transition-colors">Privacy</Link>
                 <Link href="/cookies" className="hover:text-foreground/70 transition-colors">Cookie Preferences</Link>

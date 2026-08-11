@@ -172,13 +172,13 @@ function ChatContent() {
             {view === 'home' ? (
                 <div className="flex-1 flex flex-col items-center justify-between animate-fade-in-up overflow-y-auto">
                     {/* Center content */}
-                    <div className="flex-1 flex flex-col items-center justify-center w-full px-6 max-w-3xl mx-auto">
+                    <div className="flex-1 flex flex-col items-center justify-center w-full px-4 md:px-6 max-w-3xl mx-auto">
                         {/* Greeting */}
-                        <div className="text-center mb-8">
-                            <h1 className="text-4xl md:text-5xl font-extrabold text-foreground mb-3 tracking-tight">
+                        <div className="text-center mb-6 md:mb-8">
+                            <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-foreground mb-2 md:mb-3 tracking-tight">
                                 {greeting}, <span className="greeting-gradient font-black">{user ? (user.display_name || user.name) : "guest"}</span>
                             </h1>
-                            <p className="text-foreground/40 text-sm font-medium">
+                            <p className="text-foreground/40 text-xs md:text-sm font-medium">
                                 Stars can only shine in the dark.
                             </p>
                         </div>
@@ -203,10 +203,10 @@ function ChatContent() {
                                     typeDropdown={
                                         <button
                                             onClick={() => setIsProjectTypeOpen(true)}
-                                            className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] px-3 py-1.5 text-xs text-foreground/70 flex items-center gap-1.5 hover:text-foreground transition-all"
+                                            className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs text-foreground/70 flex items-center gap-1 md:gap-1.5 hover:text-foreground transition-all"
                                         >
                                             <Pencil className="w-3 h-3 text-foreground/60" />
-                                            <span>{projectTypeLabels[language] || 'Auto'}</span>
+                                            <span className="hidden sm:inline">{projectTypeLabels[language] || 'Auto'}</span>
                                             <ChevronDown className="w-3 h-3 text-zinc-500" />
                                         </button>
                                     }
@@ -214,17 +214,17 @@ function ChatContent() {
                             </div>
 
                             {/* Community badge */}
-                            <div className="flex items-center justify-center gap-1.5 mt-5 text-[11px] text-foreground/40 font-medium bg-[hsl(var(--surface))]/60 border border-[hsl(var(--surface-sunk))]/60 px-4 py-2 rounded-full w-fit mx-auto">
-                                <Globe className="w-3.5 h-3.5 text-foreground/40 mr-1" />
-                                <span>Your creations are shared with the community. <Link href="/pricing" className="text-foreground hover:underline">Upgrade to Enterprise</Link> for private projects.</span>
+                            <div className="flex items-center justify-center gap-1.5 mt-4 md:mt-5 text-[10px] md:text-[11px] text-foreground/40 font-medium bg-[hsl(var(--surface))]/60 border border-[hsl(var(--surface-sunk))]/60 px-3 md:px-4 py-2 rounded-full w-fit mx-auto text-center">
+                                <Globe className="w-3.5 h-3.5 text-foreground/40 mr-1 shrink-0" />
+                                <span>Your creations are shared with the community. <Link href="/pricing" className="text-foreground hover:underline">Upgrade</Link> for private projects.</span>
                             </div>
 
                             {/* Bottom links */}
-                            <div className="flex items-center justify-center gap-6 mt-6 text-xs text-foreground/40 font-medium">
+                            <div className="flex items-center justify-center gap-4 md:gap-6 mt-4 md:mt-6 text-[11px] md:text-xs text-foreground/40 font-medium flex-wrap">
                                 <Link href="/community" className="hover:text-foreground transition-colors flex items-center gap-1.5">
                                     <Sparkles className="w-3 h-3" /> Explore Community Plugins
                                 </Link>
-                                <span className="text-foreground/20">|</span>
+                                <span className="text-foreground/20 hidden sm:inline">|</span>
                                 <button onClick={() => setView('projects')} className="hover:text-foreground transition-colors flex items-center gap-1.5">
                                     <Clock className="w-3 h-3" /> Your Projects
                                 </button>
@@ -236,35 +236,35 @@ function ChatContent() {
                     <Footer />
                 </div>
             ) : (
-                <div className="flex-1 p-8 max-w-6xl mx-auto w-full animate-fade-in overflow-y-auto flex flex-col justify-between min-h-full">
+                <div className="flex-1 p-4 md:p-8 max-w-6xl mx-auto w-full animate-fade-in overflow-y-auto flex flex-col justify-between min-h-full">
                     <div>
-                        <div className="flex items-center justify-between mb-6">
-                            <h1 className="text-3xl font-black text-foreground">Your Projects</h1>
+                        <div className="flex items-center justify-between mb-4 md:mb-6">
+                            <h1 className="text-2xl md:text-3xl font-black text-foreground">Your Projects</h1>
                             <button
                                 onClick={() => setView('home')}
-                                className="glass-capsule px-4 py-2 text-xs text-foreground flex items-center gap-2 hover:border-[hsl(var(--text)/0.5)] transition-all"
+                                className="glass-capsule px-3 md:px-4 py-1.5 md:py-2 text-[10px] md:text-xs text-foreground flex items-center gap-1.5 md:gap-2 hover:border-[hsl(var(--text)/0.5)] transition-all"
                             >
-                                <Plus className="w-3.5 h-3.5 text-foreground" /> New Project
+                                <Plus className="w-3.5 h-3.5 text-foreground" /> <span className="hidden sm:inline">New Project</span>
                             </button>
                         </div>
                         {loadingProjects ? (
                             <div className="flex items-center justify-center py-16 text-foreground/50">Loading...</div>
                         ) : projects.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-24 text-center">
-                                <div className="w-16 h-16 rounded-2xl glass-card flex items-center justify-center mb-4">
-                                    <Boxes className="w-7 h-7 text-foreground/40" />
+                            <div className="flex flex-col items-center justify-center py-16 md:py-24 text-center">
+                                <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl glass-card flex items-center justify-center mb-4">
+                                    <Boxes className="w-6 h-6 md:w-7 md:h-7 text-foreground/40" />
                                 </div>
-                                <p className="text-foreground/40 text-sm">No projects yet. Start by describing what you want to build.</p>
+                                <p className="text-foreground/40 text-xs md:text-sm">No projects yet. Start by describing what you want to build.</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                                 {projects.map((proj) => (
                                     <div
                                         key={proj.id}
                                         onClick={() => router.push(`/ide/${proj.id}`)}
-                                        className="group glass-card p-5 rounded-2xl hover:border-[hsl(var(--text)/0.4)] transition-all cursor-pointer relative"
+                                        className="group glass-card p-4 md:p-5 rounded-2xl hover:border-[hsl(var(--text)/0.4)] transition-all cursor-pointer relative"
                                     >
-                                        <div className="absolute top-4 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="absolute top-3 right-3 md:top-4 md:right-4 flex gap-1 md:gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                              <button onClick={(e) => handleRenameProject(e, proj.id, proj.name)} className="p-1.5 rounded-lg bg-[hsl(var(--surface-sunk))] text-foreground/50 hover:text-foreground border border-[hsl(var(--surface-sunk))]" title="Rename">
                                                 <Edit2 className="w-3.5 h-3.5" />
                                             </button>
@@ -275,11 +275,11 @@ function ChatContent() {
                                                 <Trash className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
-                                        <div className="w-10 h-10 rounded-xl bg-[hsl(var(--surface-sunk))] flex items-center justify-center mb-4 border border-[hsl(var(--surface-sunk))]">
-                                            <Boxes className="w-5 h-5 text-foreground/60" />
+                                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-[hsl(var(--surface-sunk))] flex items-center justify-center mb-3 md:mb-4 border border-[hsl(var(--surface-sunk))]">
+                                            <Boxes className="w-4 h-4 md:w-5 md:h-5 text-foreground/60" />
                                         </div>
-                                        <h3 className="font-bold text-foreground mb-1 truncate pr-8">{proj.name || proj.id}</h3>
-                                        <div className="flex items-center gap-3 text-foreground/40 text-xs mt-3">
+                                        <h3 className="font-bold text-foreground mb-1 truncate pr-8 text-sm md:text-base">{proj.name || proj.id}</h3>
+                                        <div className="flex items-center gap-3 text-foreground/40 text-[11px] md:text-xs mt-2 md:mt-3">
                                             <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> {proj.last_updated ? new Date(proj.last_updated).toLocaleDateString() : '—'}</span>
                                         </div>
                                     </div>

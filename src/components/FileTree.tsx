@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { File, Folder, ChevronRight, ChevronDown, Plus, Trash2, Edit2, FolderPlus, Upload, Download, ArchiveRestore, FileArchive, Loader2, RefreshCw, FileText, Minimize2 } from 'lucide-react';
 import { fileApi } from '@/lib/api';
 
@@ -47,6 +47,8 @@ export const FileTree = ({
     const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const treeRef = useRef<HTMLDivElement>(null);
+    const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
     useEffect(() => {
         const handler = () => setContextMenu(null);
@@ -55,6 +57,35 @@ export const FileTree = ({
         return () => {
             document.removeEventListener('click', handler);
             document.removeEventListener('scroll', handler, true);
+        };
+    }, []);
+
+    // Long-press handlers for mobile context menu
+    const handleTouchStart = useCallback((e: React.TouchEvent, type: 'tree' | 'file' | 'folder', path?: string) => {
+        const touch = e.touches[0];
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+        longPressTimerRef.current = setTimeout(() => {
+            setContextMenu({ x: touch.clientX, y: touch.clientY, type, path });
+        }, 500);
+    }, []);
+
+    const handleTouchMove = useCallback(() => {
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+    }, []);
+
+    const handleTouchEnd = useCallback(() => {
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
         };
     }, []);
 
@@ -164,6 +195,9 @@ export const FileTree = ({
                         else onSelect(node.path);
                     }}
                     onContextMenu={(e) => handleContextMenu(e, node.type, node.path)}
+                    onTouchStart={(e) => handleTouchStart(e, node.type, node.path)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                 >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                         {node.type === 'folder' ? (
@@ -315,6 +349,13 @@ export const FileTree = ({
                         handleContextMenu(e, 'tree');
                     }
                 }}
+                onTouchStart={(e) => {
+                    if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.flex-1.overflow-y-auto') === e.currentTarget) {
+                        handleTouchStart(e, 'tree');
+                    }
+                }}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
             >
                 {treeData.children.length > 0 ? (
                     treeData.children.map(node => renderNode(node))
@@ -331,7 +372,10 @@ export const FileTree = ({
             {contextMenu && contextMenuItems.length > 0 && (
                 <div
                     className="fixed z-[150] min-w-[180px] rounded-xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] shadow-2xl py-1 animate-scale-in"
-                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                    style={{
+                        top: Math.min(contextMenu.y, window.innerHeight - 250),
+                        left: Math.min(contextMenu.x, window.innerWidth - 200)
+                    }}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {contextMenuItems.map((item, i) => {
@@ -344,7 +388,7 @@ export const FileTree = ({
                                     item.onClick();
                                     setContextMenu(null);
                                 }}
-                                className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors ${item.danger
+                                className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-xs font-medium transition-colors ${item.danger
                                     ? 'text-red-400 hover:bg-red-500/10'
                                     : 'text-muted hover:text-foreground hover:bg-[hsl(var(--surface-sunk))]'
                                 }`}

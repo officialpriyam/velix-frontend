@@ -140,6 +140,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
     const [shareToken, setShareToken] = useState<string | null>(null);
     const [shareTokenCopied, setShareTokenCopied] = useState(false);
     const [fileTab, setFileTab] = useState<'files' | 'code'>('files');
+    const [mobileTab, setMobileTab] = useState<'chat' | 'files' | 'editor'>('chat');
     const [selectedCompiler, setSelectedCompiler] = useState<string>('javac');
 
     // Build result state (shown in chat)
@@ -714,11 +715,17 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
     const filteredVersions = versionFilter === 'all' ? versionStats.versions : versionStats.versions.filter(v => v.commit_type === versionFilter);
 
     return (
-        <div className="flex-1 flex overflow-hidden">
-            {/* Left: Chat */}
-            <div className="w-[380px] lg:w-[420px] flex flex-col border-r border-[hsl(var(--surface-sunk))] shrink-0">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+            {/* Desktop: three columns side by side */}
+            {/* Mobile: single panel with bottom tab bar */}
+
+            {/* ─── Chat Panel ─── */}
+            <div className={`
+                ${mobileTab === 'chat' ? 'flex' : 'hidden'} md:flex
+                w-full md:w-[380px] lg:w-[420px] flex-col md:border-r border-[hsl(var(--surface-sunk))] shrink-0
+            `}>
                 <div className="flex-1 overflow-hidden">
-<ChatPanel
+                    <ChatPanel
                         sessionId={sessionId}
                         onCodeGenerated={handleCodeGenerated}
                         onFileStream={(file) => {
@@ -736,6 +743,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                         onOpenFile={(path) => {
                             if (files[path]) setSelectedFile(path);
                             else loadFiles(sessionId, path);
+                            setMobileTab('editor');
                         }}
                         language={language}
                         platform={platform}
@@ -760,8 +768,11 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                 </div>
             </div>
 
-            {/* Middle: Files */}
-            <div className="w-64 lg:w-72 flex flex-col border-r border-[hsl(var(--surface-sunk))] shrink-0">
+            {/* ─── Files Panel ─── */}
+            <div className={`
+                ${mobileTab === 'files' ? 'flex' : 'hidden'} md:flex
+                w-full md:w-64 lg:w-72 flex-col md:border-r border-[hsl(var(--surface-sunk))] shrink-0
+            `}>
                 <div className="flex items-center justify-between px-3 py-2 border-b border-[hsl(var(--surface-sunk))]">
                     <div className="flex items-center gap-1">
                         <button onClick={() => setFileTab('files')} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${fileTab === 'files' ? 'bg-[hsl(var(--surface-sunk))] text-foreground font-bold' : 'text-muted hover:text-foreground hover:bg-[hsl(var(--surface-sunk))]'}`}>
@@ -810,7 +821,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                             </div>
                         )}
                         <div className="flex-1 overflow-hidden">
-                            <FileTree sessionId={sessionId} files={Object.keys(files)} selectedFile={selectedFile} onSelect={setSelectedFile} onCreateFile={handleCreateFile} onCreateFolder={handleCreateFolder} onDelete={handleDeletePath} onRename={handleRenamePath} onRefresh={() => loadFiles(sessionId)} />
+                            <FileTree sessionId={sessionId} files={Object.keys(files)} selectedFile={selectedFile} onSelect={(path) => { setSelectedFile(path); setMobileTab('editor'); }} onCreateFile={handleCreateFile} onCreateFolder={handleCreateFolder} onDelete={handleDeletePath} onRename={handleRenamePath} onRefresh={() => loadFiles(sessionId)} />
                         </div>
                     </div>
                 ) : (
@@ -828,11 +839,14 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                 )}
             </div>
 
-            {/* Right: Code */}
-            <div className="flex-1 flex flex-col min-w-0">
+            {/* ─── Editor Panel ─── */}
+            <div className={`
+                ${mobileTab === 'editor' ? 'flex' : 'hidden'} md:flex
+                flex-1 flex-col min-w-0
+            `}>
                 <div className="flex-1 relative overflow-hidden">
                     {selectedFile ? (
-                        <Editor file={selectedFile} content={files[selectedFile] || ''} onChange={handleSaveFile} onSelectionChange={setHighlight} onSave={() => selectedFile && handleSaveFile(files[selectedFile])} onClose={() => setSelectedFile(null)} />
+                        <Editor file={selectedFile} content={files[selectedFile] || ''} onChange={handleSaveFile} onSelectionChange={setHighlight} onSave={() => selectedFile && handleSaveFile(files[selectedFile])} onClose={() => { setSelectedFile(null); setMobileTab('files'); }} />
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center text-center">
                             <div className="w-14 h-14 rounded-2xl bg-[hsl(var(--surface-sunk))] border border-[hsl(var(--surface-sunk))] flex items-center justify-center mb-4"><FileText className="w-6 h-6 text-muted" /></div>
@@ -840,6 +854,37 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                         </div>
                     )}
                 </div>
+            </div>
+
+            {/* ─── Mobile Bottom Tab Bar ─── */}
+            <div className="md:hidden flex items-center border-t border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] shrink-0 safe-area-bottom">
+                <button
+                    onClick={() => setMobileTab('chat')}
+                    className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 transition-colors ${
+                        mobileTab === 'chat' ? 'text-primary' : 'text-muted hover:text-foreground'
+                    }`}
+                >
+                    <MessageSquare className="w-5 h-5" />
+                    <span className="text-[10px] font-semibold">Chat</span>
+                </button>
+                <button
+                    onClick={() => setMobileTab('files')}
+                    className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 transition-colors ${
+                        mobileTab === 'files' ? 'text-primary' : 'text-muted hover:text-foreground'
+                    }`}
+                >
+                    <FolderOpen className="w-5 h-5" />
+                    <span className="text-[10px] font-semibold">Files {fileCount > 0 && <span className="text-primary">({fileCount})</span>}</span>
+                </button>
+                <button
+                    onClick={() => setMobileTab('editor')}
+                    className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 transition-colors ${
+                        mobileTab === 'editor' ? 'text-primary' : 'text-muted hover:text-foreground'
+                    }`}
+                >
+                    <Code2 className="w-5 h-5" />
+                    <span className="text-[10px] font-semibold">{selectedFile ? selectedFile.split('/').pop()?.slice(0, 10) : 'Editor'}</span>
+                </button>
             </div>
 
             {/* ════════════════════════ MODALS ════════════════════════ */}

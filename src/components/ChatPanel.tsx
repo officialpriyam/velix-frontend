@@ -1313,13 +1313,13 @@ export const ChatPanel = ({
                     <div className={`relative ${loading ? 'm-[1px] rounded-[15px] bg-[hsl(var(--surface))]' : ''}`}>
                     {/* Attached files preview */}
                     {attachedFiles.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mb-2 px-2">
+                        <div className="flex flex-wrap gap-1 md:gap-1.5 mb-2 px-2">
                             {attachedFiles.map((f, i) => (
-                                <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] text-foreground group">
+                                <div key={i} className="flex items-center gap-1 md:gap-1.5 px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] md:text-[11px] text-foreground group">
                                     {f.type.startsWith('image/') ? <Image className="w-3 h-3 text-primary shrink-0" /> : <FileCode className="w-3 h-3 text-primary shrink-0" />}
-                                    <span className="truncate max-w-[120px]">{f.name}</span>
-                                    <span className="text-muted text-[10px]">{formatFileSize(f.size)}</span>
-                                    <button onClick={() => removeAttachedFile(i)} className="p-0.5 rounded hover:bg-white/10 text-muted hover:text-foreground transition-colors opacity-0 group-hover:opacity-100">
+                                    <span className="truncate max-w-[80px] md:max-w-[120px]">{f.name}</span>
+                                    <span className="text-muted text-[9px] md:text-[10px] hidden sm:inline">{formatFileSize(f.size)}</span>
+                                    <button onClick={() => removeAttachedFile(i)} className="p-0.5 rounded hover:bg-white/10 text-muted hover:text-foreground transition-colors sm:opacity-0 sm:group-hover:opacity-100">
                                         <Trash2 className="w-2.5 h-2.5" />
                                     </button>
                                 </div>
@@ -1347,9 +1347,9 @@ export const ChatPanel = ({
                             }
                         }}
                         placeholder={execMode === 'chat' ? "Ask me anything..." : isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : attachedFiles.length > 0 ? "Add a message about the uploaded files..." : "Describe what you want to build..."}
-                        className="neu-input w-full text-xs text-foreground rounded-2xl p-4 pr-20 outline-none transition-all resize-none h-20"
+                        className="neu-input w-full text-xs text-foreground rounded-2xl p-3 md:p-4 pr-16 md:pr-20 outline-none transition-all resize-none h-16 md:h-20"
                     />
-                    <div className="absolute right-3 bottom-3 flex items-center gap-1.5 z-20">
+                    <div className="absolute right-2 md:right-3 bottom-2 md:bottom-3 flex items-center gap-1 md:gap-1.5 z-20">
                         {/* Model Selector Dropdown */}
                         {modelDropdown ? modelDropdown : (
                             <ModelSelector selectedModel={model} onSelectModel={() => {}} />
@@ -1360,7 +1360,7 @@ export const ChatPanel = ({
                             <button
                                 type="button"
                                 onClick={() => setShowExecModeDropdown(!showExecModeDropdown)}
-                                className="rounded-full border border-white/10 bg-[hsl(var(--surface-sunk))] px-2.5 py-1 text-[11px] text-foreground/80 flex items-center gap-1 hover:bg-white/10 hover:text-foreground transition-all font-semibold"
+                                className="rounded-full border border-white/10 bg-[hsl(var(--surface-sunk))] px-2 md:px-2.5 py-1 text-[10px] md:text-[11px] text-foreground/80 flex items-center gap-1 hover:bg-white/10 hover:text-foreground transition-all font-semibold"
                                 title="Execution mode"
                             >
                                 <span className="capitalize">{execMode === 'build' ? 'Build' : execMode === 'plan' ? 'Plan' : 'Chat'}</span>

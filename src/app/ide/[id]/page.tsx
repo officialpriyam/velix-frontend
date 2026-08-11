@@ -90,51 +90,51 @@ export default function IdePage() {
 
             <div className="flex-1 flex flex-col relative overflow-hidden">
                 {/* ─── Top Bar ─── */}
-                <header className="h-12 flex items-center justify-between px-4 z-30 shrink-0 border-b border-white/5 bg-background/80 backdrop-blur-xl">
-                    {/* Left: Back + session name */}
-                    <div className="flex items-center gap-3">
+                <header className="h-11 md:h-12 flex items-center justify-between px-2 md:px-4 z-30 shrink-0 border-b border-white/5 bg-background/80 backdrop-blur-xl">
+                    {/* Left: Back */}
+                    <div className="flex items-center gap-2 md:gap-3">
                         <button onClick={() => router.push('/chat')} className="p-1.5 rounded-lg hover:bg-[hsl(var(--surface-sunk))] text-muted hover:text-foreground transition-all" title="Back to chat">
                             <ArrowLeft className="w-4 h-4" />
                         </button>
                     </div>
 
-                    {/* Center: Tabs */}
-                    <div className="flex items-center gap-1">
-                        <button onClick={() => setActiveModal('settings')} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all">
-                            <SettingsIcon className="w-3.5 h-3.5" />
+                    {/* Center: Tabs - compact on mobile */}
+                    <div className="flex items-center gap-0.5 md:gap-1">
+                        <button onClick={() => setActiveModal('settings')} className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all" title="Settings">
+                            <SettingsIcon className="w-4 h-4 md:w-3.5 md:h-3.5" />
                             <span className="hidden md:inline">Settings</span>
                         </button>
-                        <button onClick={() => setActiveModal('history')} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all">
-                            <HistoryIcon className="w-3.5 h-3.5" />
+                        <button onClick={() => setActiveModal('history')} className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all" title="History">
+                            <HistoryIcon className="w-4 h-4 md:w-3.5 md:h-3.5" />
                             <span className="hidden md:inline">History</span>
                         </button>
-                        <button onClick={() => setActiveModal('deps')} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all">
-                            <Package className="w-3.5 h-3.5" />
+                        <button onClick={() => setActiveModal('deps')} className="hidden sm:flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all" title="Dependencies">
+                            <Package className="w-4 h-4 md:w-3.5 md:h-3.5" />
                             <span className="hidden md:inline">Dependencies</span>
                         </button>
                     </div>
 
-                    {/* Right: Actions */}
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => setActiveModal('wiki')} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary/20 text-primary rounded-lg hover:bg-primary/30 transition-all">
-                            <BookOpen className="w-3.5 h-3.5" />
+                    {/* Right: Actions - very compact on mobile */}
+                    <div className="flex items-center gap-1 md:gap-2">
+                        <button onClick={() => setActiveModal('wiki')} className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 text-xs font-medium bg-primary/20 text-primary rounded-lg hover:bg-primary/30 transition-all" title="Wiki">
+                            <BookOpen className="w-4 h-4 md:w-3.5 md:h-3.5" />
                             <span className="hidden md:inline">Wiki</span>
                         </button>
-                        <button onClick={() => setActiveModal('share')} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all">
-                            <Share2 className="w-3.5 h-3.5" />
+                        <button onClick={() => setActiveModal('share')} className="hidden sm:flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all" title="Share">
+                            <Share2 className="w-4 h-4 md:w-3.5 md:h-3.5" />
                             <span className="hidden md:inline">Share</span>
                         </button>
-                        <button onClick={() => setActiveModal('clone')} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all">
-                            <Copy className="w-3.5 h-3.5" />
+                        <button onClick={() => setActiveModal('clone')} className="hidden sm:flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all" title="Clone">
+                            <Copy className="w-4 h-4 md:w-3.5 md:h-3.5" />
                             <span className="hidden md:inline">Clone</span>
                         </button>
-                        <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all">
+                        <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all" title="GitHub">
                             <Github className="w-3.5 h-3.5" />
-                            <span className="hidden md:inline">GitHub</span>
+                            <span>GitHub</span>
                         </a>
                         <ThemeToggle />
                         {user && (
-                            <Link href="/credits" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-foreground hover:text-primary rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all">
+                            <Link href="/credits" className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-foreground hover:text-primary rounded-lg hover:bg-[hsl(var(--surface-sunk))] transition-all">
                                 <Coins className="w-3.5 h-3.5 text-primary" />
                                 <span>{user.credits ?? 0}</span>
                             </Link>
