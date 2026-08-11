@@ -92,18 +92,18 @@ export default function Community() {
                 <TopHeader user={user} onLogout={logout} />
 
                 <div className="flex-1 overflow-y-auto">
-                    <div className="max-w-7xl mx-auto px-8 py-10">
+                    <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-10">
                         {/* Header */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 mb-6 md:mb-10">
                             <div>
-                                <div className="inline-flex items-center gap-2 glass-capsule px-4 py-1.5 mb-4 text-xs text-primary">
-                                    <Globe className="w-3.5 h-3.5 animate-pulse" />
+                                <div className="inline-flex items-center gap-2 glass-capsule px-3 md:px-4 py-1.5 mb-3 md:mb-4 text-[10px] md:text-xs text-primary">
+                                    <Globe className="w-3 h-3 md:w-3.5 md:h-3.5 animate-pulse" />
                                     Public Showcase
                                 </div>
-                                <h1 className="text-4xl md:text-5xl font-black text-foreground flex items-center gap-4">
+                                <h1 className="text-2xl md:text-4xl lg:text-5xl font-black text-foreground">
                                     Community <span className="gradient-text">Showcase</span>
                                 </h1>
-                                <p className="text-muted mt-2 text-sm">Explore, fork, and build upon public projects created by the community.</p>
+                                <p className="text-muted mt-2 text-xs md:text-sm">Explore, fork, and build upon public projects created by the community.</p>
                             </div>
 
                             <div className="relative group max-w-md w-full">

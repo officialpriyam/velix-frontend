@@ -1316,11 +1316,29 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
             {/* Session Settings Modal */}
             {activeModal === 'settings' && (
                 <ModalOverlay onClose={() => setActiveModal(null)}>
-                    <div className="w-full max-w-4xl max-h-[85vh] neu-card flex overflow-hidden animate-scale-in" onClick={e => e.stopPropagation()}>
-                        {/* Sidebar */}
-                        <div className="w-56 border-r border-[hsl(var(--surface-sunk))] p-4 flex flex-col shrink-0">
-                            <h3 className="text-sm font-extrabold text-foreground mb-4 px-2">Session Settings</h3>
-                            <div className="flex-1 overflow-y-auto space-y-4">
+                    <div className="w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] neu-card flex flex-col md:flex-row overflow-hidden animate-scale-in" onClick={e => e.stopPropagation()}>
+                        {/* Sidebar - horizontal on mobile, vertical on desktop */}
+                        <div className="md:w-56 border-b md:border-b-0 md:border-r border-[hsl(var(--surface-sunk))] p-3 md:p-4 flex flex-col shrink-0">
+                            <div className="flex items-center justify-between mb-3 md:mb-4">
+                                <h3 className="text-xs md:text-sm font-extrabold text-foreground px-2">Session Settings</h3>
+                                <button onClick={() => setActiveModal(null)} className="md:hidden p-1.5 rounded-lg hover:bg-[hsl(var(--surface-sunk))] text-muted hover:text-foreground">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                            {/* Mobile: horizontal scrollable tabs */}
+                            <div className="flex md:hidden gap-1 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-none">
+                                {SETTINGS_NAV.flatMap(g => g.items).map(item => {
+                                    const Icon = item.icon;
+                                    return (
+                                        <button key={item.id} onClick={() => setSettingsTab(item.id)}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium whitespace-nowrap transition-all shrink-0 ${settingsTab === item.id ? 'bg-[hsl(var(--surface-sunk))] text-foreground font-bold' : 'text-muted hover:text-foreground hover:bg-[hsl(var(--surface-sunk))]'}`}>
+                                            <Icon className="w-3 h-3" /> {item.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {/* Desktop: vertical nav */}
+                            <div className="hidden md:flex flex-1 overflow-y-auto space-y-4">
                                 {SETTINGS_NAV.map(group => (
                                     <div key={group.group}>
                                         <div className="px-2 mb-1.5 text-[9px] font-bold uppercase tracking-widest text-faint">{group.group}</div>
@@ -1336,14 +1354,14 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                                     </div>
                                 ))}
                             </div>
-                            <div className="flex gap-2 mt-4 pt-4 border-t border-[hsl(var(--surface-sunk))]">
+                            <div className="hidden md:flex gap-2 mt-4 pt-4 border-t border-[hsl(var(--surface-sunk))]">
                                 <button onClick={() => setActiveModal(null)} className="flex-1 px-3 py-2 text-xs font-bold text-muted border border-[hsl(var(--surface-sunk))] rounded-lg hover:text-foreground transition-all">Cancel</button>
                                 <button onClick={handleSaveSettings} className="flex-1 px-3 py-2 text-xs font-bold text-background bg-primary rounded-lg hover:opacity-90 transition-all">Save</button>
                             </div>
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-6">
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6">
                             {settingsTab === 'overview' && (
                                 <SettingsContent title="Overview" subtitle="Session statistics and information">
                                     <div className="neu-inset rounded-xl p-5 mb-4">
@@ -1670,6 +1688,11 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                                     </div>
                                 </SettingsContent>
                             )}
+                            {/* Mobile save/cancel buttons */}
+                            <div className="md:hidden flex gap-2 mt-4 pt-4 border-t border-[hsl(var(--surface-sunk))]">
+                                <button onClick={() => setActiveModal(null)} className="flex-1 px-3 py-2.5 text-xs font-bold text-muted border border-[hsl(var(--surface-sunk))] rounded-lg hover:text-foreground transition-all">Cancel</button>
+                                <button onClick={handleSaveSettings} className="flex-1 px-3 py-2.5 text-xs font-bold text-background bg-primary rounded-lg hover:opacity-90 transition-all">Save</button>
+                            </div>
                         </div>
                     </div>
                 </ModalOverlay>

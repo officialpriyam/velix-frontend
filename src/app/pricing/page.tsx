@@ -160,7 +160,7 @@ export default function PricingPage() {
                 <TopHeader user={user} onLogout={logout} />
 
                 <div className="flex-1 overflow-y-auto">
-                    <section className="max-w-6xl mx-auto px-6 pt-10 pb-20">
+                    <section className="max-w-6xl mx-auto px-4 md:px-6 pt-6 md:pt-10 pb-12 md:pb-20">
                         <div className="text-center mb-12">
                             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[hsl(var(--text)/0.3)] bg-[hsl(var(--primary)/0.15)] text-primary text-xs font-bold uppercase tracking-wider mb-4 animate-pulse">
                                 <Sparkles className="w-3.5 h-3.5" />
@@ -189,7 +189,7 @@ export default function PricingPage() {
                         )}
 
                         {/* Pricing Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-10 md:mb-16">
                             {packages.map((pack, idx) => (
                                 <div
                                     key={`${pack.name}-${idx}`}
@@ -269,11 +269,11 @@ export default function PricingPage() {
                         </div>
 
                         {/* Feature Matrix */}
-                        <div className="neu-card rounded-2xl p-6 mb-16 overflow-x-auto">
-                            <h3 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
-                                <Check className="w-5 h-5 text-primary" /> Complete Package Matrix
+                        <div className="neu-card rounded-2xl p-4 md:p-6 mb-10 md:mb-16 overflow-x-auto">
+                            <h3 className="text-lg md:text-xl font-bold text-foreground mb-4 md:mb-6 flex items-center gap-2">
+                                <Check className="w-4 h-4 md:w-5 md:h-5 text-primary" /> Complete Package Matrix
                             </h3>
-                            <table className="w-full text-left border-collapse text-xs">
+                            <table className="w-full text-left border-collapse text-[10px] md:text-xs min-w-[600px]">
                                 <thead>
                                     <tr className="border-b border-zinc-800 text-muted font-bold uppercase tracking-wider">
                                         <th className="pb-3 pr-4">Feature Parameters</th>

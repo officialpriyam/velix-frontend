@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
     ArrowLeft, Settings as SettingsIcon, History as HistoryIcon, Package,
-    Share2, Github, Coins, Copy, BookOpen
+    Share2, Github, Coins, Copy, BookOpen, Play
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import { WorkspaceView } from '@/components/workspace/WorkspaceView';
@@ -116,6 +116,10 @@ export default function IdePage() {
 
                     {/* Right: Actions - very compact on mobile */}
                     <div className="flex items-center gap-1 md:gap-2">
+                        <button onClick={() => setActiveModal('compile')} className="flex items-center gap-1 px-2 md:px-3 py-1.5 text-[10px] md:text-xs font-bold text-background bg-primary rounded-lg hover:opacity-90 transition-all" title="Compile">
+                            <Play className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Compile</span>
+                        </button>
                         <button onClick={() => setActiveModal('wiki')} className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 text-xs font-medium bg-primary/20 text-primary rounded-lg hover:bg-primary/30 transition-all" title="Wiki">
                             <BookOpen className="w-4 h-4 md:w-3.5 md:h-3.5" />
                             <span className="hidden md:inline">Wiki</span>

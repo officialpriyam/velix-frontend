@@ -135,24 +135,24 @@ export default function StudioPage() {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <div className="max-w-5xl mx-auto px-6 py-10">
+            <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-10">
                 {/* Back */}
-                <Link href="/chat" className="inline-flex items-center gap-2 text-xs text-muted hover:text-foreground transition-colors mb-8">
+                <Link href="/chat" className="inline-flex items-center gap-2 text-xs text-muted hover:text-foreground transition-colors mb-6 md:mb-8">
                     <ArrowLeft className="w-3 h-3" /> Back to Home
                 </Link>
 
                 {/* Hero */}
-                <div className="text-center mb-10">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-400 mb-4">
+                <div className="text-center mb-6 md:mb-10">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-400 mb-3 md:mb-4">
                         Beta
                     </span>
-                    <h1 className="text-4xl md:text-5xl font-extrabold mb-3 tracking-tight">
+                    <h1 className="text-2xl md:text-4xl lg:text-5xl font-extrabold mb-2 md:mb-3 tracking-tight">
                         Imagine it. <span className="text-foreground/40">Generate it.</span>
                     </h1>
-                    <p className="text-sm text-muted max-w-md mx-auto">
+                    <p className="text-xs md:text-sm text-muted max-w-md mx-auto">
                         Turn your ideas into Minecraft textures, 3D models, and schematics with AI.
                     </p>
-                    <p className="text-xs text-amber-400/90 max-w-md mx-auto mt-4 leading-relaxed">
+                    <p className="text-[10px] md:text-xs text-amber-400/90 max-w-md mx-auto mt-3 md:mt-4 leading-relaxed">
                         This page is in beta. It can break, and the AI may generate broken or incorrect results. Use at your own risk — results are not guaranteed.
                     </p>
                 </div>
