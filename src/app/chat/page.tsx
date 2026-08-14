@@ -203,10 +203,10 @@ function ChatContent() {
                                     typeDropdown={
                                         <button
                                             onClick={() => setIsProjectTypeOpen(true)}
-                                            className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs text-foreground/70 flex items-center gap-1 md:gap-1.5 hover:text-foreground transition-all"
+                                            className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs text-foreground/70 flex items-center gap-1 md:gap-1.5 hover:text-foreground transition-all w-16 shrink-0"
                                         >
                                             <Pencil className="w-3 h-3 text-foreground/60" />
-                                            <span className="hidden sm:inline">{projectTypeLabels[language] || 'Auto'}</span>
+                                            <span className="truncate max-w-px text-[10px] md:text-xs">{projectTypeLabels[language] || 'Auto'}</span>
                                             <ChevronDown className="w-3 h-3 text-zinc-500" />
                                         </button>
                                     }

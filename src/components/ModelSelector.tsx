@@ -110,15 +110,15 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs text-foreground/80 flex items-center gap-1 hover:text-foreground hover:bg-[hsl(var(--surface-sunk))]/80 transition-all shadow-sm font-medium relative z-50"
+                className="rounded-full border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface-sunk))] px-2 md:px-3 py-1 md:py-1.5 text-[10px] md:text-xs text-foreground/80 flex items-center gap-1 flex-shrink-0 hover:text-foreground hover:bg-[hsl(var(--surface-sunk))]/80 transition-all shadow-sm font-medium relative z-50"
             >
                 <Sparkles className="w-3 h-3 md:w-3.5 md:h-3.5 text-primary" />
-                <span className="truncate max-w-[70px] md:max-w-[130px]">{getDisplayName(selectedModel)}</span>
+                <span className="truncate max-w-[50px] md:max-w-[90px]">{getDisplayName(selectedModel)}</span>
                 <ChevronDown className="w-2.5 h-2.5 md:w-3 md:h-3 text-muted" />
             </button>
 
             {isOpen && (
-                <div className={`absolute left-0 z-[100] w-[280px] sm:w-[320px] rounded-2xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] p-2.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 ${openUp ? 'bottom-full mb-2' : 'top-full mt-2'}`}>
+                <div className={`absolute left-1/2 -translate-x-1/2 z-[100] w-[240px] sm:w-[280px] rounded-2xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] p-2.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 ${openUp ? 'bottom-full mb-2' : 'top-full mt-2'}`}>
                     <div className="relative mb-2">
                         <Search className="w-3.5 h-3.5 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
                         <input

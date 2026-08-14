@@ -116,7 +116,7 @@ export default function IdePage() {
 
                     {/* Right: Actions - very compact on mobile */}
                     <div className="flex items-center gap-1 md:gap-2">
-                        <button onClick={() => setActiveModal('compile')} className="flex items-center gap-1 px-2 md:px-3 py-1.5 text-[10px] md:text-xs font-bold text-background bg-primary rounded-lg hover:opacity-90 transition-all" title="Compile">
+                        <button onClick={() => setActiveModal('compile')} className="flex items-center gap-1 px-2 md:px-3 py-1.5 text-[10px] md:text-xs font-bold text-background bg-primary rounded-lg hover:opacity-90 transition-all md:hidden" title="Compile">
                             <Play className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">Compile</span>
                         </button>

@@ -169,31 +169,32 @@ export const ProjectTypeModal = ({ isOpen, onClose, onSelect }: ProjectTypeModal
                     </button>
                 </div>
 
-                <div className="flex">
+                <div className="flex flex-col md:flex-row">
                     {/* Platform Sidebar */}
-                    <div className="w-56 border-r border-[hsl(var(--surface-sunk))] p-4">
-                        <div className="text-[10px] uppercase font-bold text-muted tracking-wider mb-3 flex items-center gap-2">
+                    <div className="w-full md:w-56 border-b md:border-b-0 md:border-r border-[hsl(var(--surface-sunk))] p-3 md:p-4">
+                        <div className="text-[10px] uppercase font-bold text-muted tracking-wider mb-2 md:mb-3 flex items-center gap-2">
                             <Box className="w-3 h-3" /> Platform
                         </div>
-                        <div className="space-y-1">
+                        {/* Mobile: horizontal scroll */}
+                        <div className="flex md:space-y-1 gap-2 md:gap-0 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 -mx-1 px-1 md:mx-0 md:px-0 scrollbar-none">
                             {platforms.map((platform) => (
                                 <button
                                     key={platform.id}
                                     onClick={() => handlePlatformChange(platform.id)}
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${selectedPlatform === platform.id
+                                    className={`flex items-center gap-2 md:gap-3 px-3 py-2 md:py-2.5 rounded-xl text-left transition-all shrink-0 md:w-full ${selectedPlatform === platform.id
                                         ? 'bg-[hsl(var(--primary)/0.15)] border border-[hsl(var(--text)/0.3)] text-primary'
                                         : 'text-muted hover:bg-[hsl(var(--surface-sunk))] hover:text-foreground'
                                         }`}
                                 >
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selectedPlatform === platform.id ? 'neu-raised text-primary' : 'neu-inset'
+                                    <div className={`w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center ${selectedPlatform === platform.id ? 'neu-raised text-primary' : 'neu-inset'
                                         }`}>
                                         {typeof platform.icon === 'string' ? (
-                                            <span className="text-sm font-bold">{platform.icon}</span>
+                                            <span className="text-xs md:text-sm font-bold">{platform.icon}</span>
                                         ) : platform.icon}
                                     </div>
                                     <div>
-                                        <div className="text-xs font-semibold">{platform.name}</div>
-                                        <div className="text-[10px] text-muted">{platform.subtitle}</div>
+                                        <div className="text-[11px] md:text-xs font-semibold">{platform.name}</div>
+                                        <div className="text-[9px] md:text-[10px] text-muted hidden sm:block">{platform.subtitle}</div>
                                     </div>
                                 </button>
                             ))}
@@ -201,14 +202,14 @@ export const ProjectTypeModal = ({ isOpen, onClose, onSelect }: ProjectTypeModal
                     </div>
 
                     {/* Right Panel */}
-                    <div className="flex-1 p-4">
+                    <div className="flex-1 p-3 md:p-4 min-w-0">
                         {/* Category Tabs */}
-                        <div className="flex gap-1.5 mb-4 flex-wrap">
+                        <div className="flex gap-1 md:gap-1.5 mb-3 md:mb-4 flex-wrap">
                             {currentCategories.map((cat) => (
                                 <button
                                     key={cat.id}
                                     onClick={() => handleCategoryChange(cat.id)}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                                    className={`flex items-center gap-1 md:gap-1.5 px-2 md:px-2.5 py-1.5 rounded-lg text-[10px] md:text-xs font-medium transition-all border ${
                                         selectedCategory === cat.id
                                             ? 'bg-foreground text-background border-foreground'
                                             : 'bg-white/5 text-foreground/70 border-white/10 hover:bg-white/10 hover:text-foreground hover:border-white/20'
@@ -221,35 +222,35 @@ export const ProjectTypeModal = ({ isOpen, onClose, onSelect }: ProjectTypeModal
                         </div>
 
                         {/* Language Options */}
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                        <div className="space-y-2 max-h-48 md:max-h-64 overflow-y-auto">
                             {currentLanguages.map((lang) => (
                                 <button
                                     key={lang.id}
                                     onClick={() => setSelectedLanguage(lang.id)}
-                                    className={`w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all ${selectedLanguage === lang.id
+                                    className={`w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl md:rounded-2xl text-left transition-all ${selectedLanguage === lang.id
                                         ? 'bg-[hsl(var(--primary)/0.15)] border-2 border-[hsl(var(--text)/0.5)]'
                                         : 'neu-inset border border-[hsl(var(--surface-sunk))] hover:border-[hsl(var(--text)/0.3)]'
                                         }`}
                                 >
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedLanguage === lang.id ? 'neu-raised text-primary' : 'neu-raised'
+                                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 ${selectedLanguage === lang.id ? 'neu-raised text-primary' : 'neu-raised'
                                         }`}>
                                         {typeof lang.icon === 'string' ? (
-                                            <span className="text-xl font-bold">{lang.icon}</span>
+                                            <span className="text-lg md:text-xl font-bold">{lang.icon}</span>
                                         ) : lang.icon}
                                     </div>
-                                    <div className="flex-1">
-                                        <div className="text-sm font-semibold text-foreground">{lang.name}</div>
-                                        <div className="text-xs text-muted">{lang.description}</div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-xs md:text-sm font-semibold text-foreground">{lang.name}</div>
+                                        <div className="text-[10px] md:text-xs text-muted truncate">{lang.description}</div>
                                     </div>
                                     {selectedLanguage === lang.id && (
-                                        <div className="w-6 h-6 rounded-full neu-raised text-primary flex items-center justify-center">
-                                            <Check className="w-3.5 h-3.5 text-primary" />
+                                        <div className="w-5 h-5 md:w-6 md:h-6 rounded-full neu-raised text-primary flex items-center justify-center shrink-0">
+                                            <Check className="w-3 h-3 md:w-3.5 md:h-3.5 text-primary" />
                                         </div>
                                     )}
                                 </button>
                             ))}
                             {currentLanguages.length === 0 && (
-                                <div className="text-center py-8 text-muted text-sm">
+                                <div className="text-center py-6 md:py-8 text-muted text-xs md:text-sm">
                                     No options available for this category yet.
                                 </div>
                             )}
@@ -258,17 +259,17 @@ export const ProjectTypeModal = ({ isOpen, onClose, onSelect }: ProjectTypeModal
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[hsl(var(--surface-sunk))]">
+                <div className="flex items-center justify-end gap-2 md:gap-3 px-4 md:px-6 py-3 md:py-4 border-t border-[hsl(var(--surface-sunk))]">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 text-xs font-medium text-foreground/60 hover:text-foreground border border-white/10 hover:border-white/20 rounded-lg transition-colors"
+                        className="px-3 md:px-4 py-2 text-[10px] md:text-xs font-medium text-foreground/60 hover:text-foreground border border-white/10 hover:border-white/20 rounded-lg transition-colors"
                     >
                         CANCEL
                     </button>
                     <button
                         onClick={handleConfirm}
                         disabled={!selectedLanguage}
-                        className="px-5 py-2 bg-foreground text-background text-xs font-bold uppercase tracking-wider rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90"
+                        className="px-4 md:px-5 py-2 bg-foreground text-background text-[10px] md:text-xs font-bold uppercase tracking-wider rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90"
                     >
                         Confirm Selection
                     </button>
