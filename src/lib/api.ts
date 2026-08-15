@@ -596,7 +596,11 @@ export const wikiApi = {
             credentials: 'include',
             body: JSON.stringify(data)
         });
-        return safeJson(res);
+        const json = await safeJson(res);
+        if (!res.ok) {
+            throw new Error(json.error || `GitLab push failed (${res.status})`);
+        }
+        return json;
     }
 };
 

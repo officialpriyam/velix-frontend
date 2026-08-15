@@ -261,11 +261,11 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
                 gitlab_url: gitlabUrl.trim() || undefined,
                 project_name: gitlabProjectName.trim() || undefined,
             });
-            if (result.error) {
-                showNotification(result.error, 'error');
-                return;
+            if (result.errors && result.errors.length > 0) {
+                showNotification(`Pushed ${result.pushed}/${result.total} files (${result.errors.length} failed): ${result.errors[0]}`, 'error');
+            } else {
+                showNotification(`Pushed ${result.pushed}/${result.total} files to GitLab!`, 'success');
             }
-            showNotification(`Pushed ${result.pushed}/${result.total} files to GitLab!`, 'success');
             if (result.projectUrl) {
                 window.open(result.projectUrl, '_blank');
             }
