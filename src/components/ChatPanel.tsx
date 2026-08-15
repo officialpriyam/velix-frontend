@@ -1077,6 +1077,51 @@ export const ChatPanel = ({
             <div className="flex items-center justify-end gap-2 px-3 py-2 border-b border-white/5">
                 <button onClick={async () => { if (sessionId && await showConfirm({ title: 'Clear conversation', message: 'Clear this project conversation? This cannot be undone.', danger: true })) { const result = await aiApi.clearMessages(sessionId); if (!result.error) { setMessages([]); setPlanningData(null); } } }} className="rounded-lg px-2 py-1 text-[10px] text-zinc-500 hover:text-red-300">Clear</button>
             </div>
+
+            {/* Floating AI Reasoning Bar */}
+            {loading && statusLog.length > 0 && (
+                <div className="relative mx-3 mt-2 mb-1 rounded-lg overflow-hidden z-20">
+                    {/* Animated multi-color border */}
+                    <div className="absolute inset-0 rounded-lg pointer-events-none">
+                        <div className="absolute inset-0 rounded-lg opacity-75" style={{
+                            padding: '1px',
+                            background: 'linear-gradient(90deg, #ff0080, #ff8c00, #40e0d0, #7b68ee, #ff0080)',
+                            backgroundSize: '300% 100%',
+                            animation: 'rainbow 3s linear infinite',
+                            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                            WebkitMaskComposite: 'xor',
+                            maskComposite: 'exclude',
+                        }} />
+                    </div>
+                    <style>{`
+                        @keyframes rainbow {
+                            0% { background-position: 0% 50%; }
+                            100% { background-position: 300% 50%; }
+                        }
+                    `}</style>
+                    <div className="relative z-10 bg-[#10151b] px-3 py-2">
+                        <div className="flex items-center gap-2">
+                            <Brain className="h-3.5 w-3.5 animate-pulse text-violet-300" />
+                            <span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">AI reasoning</span>
+                            <span className="text-[9px] text-zinc-500">Working…</span>
+                            <Loader2 className="h-3 w-3 animate-spin text-sky-400 ml-auto" />
+                        </div>
+                        {statusLog.length > 0 && (
+                            <div className="mt-1.5 max-h-[40px] overflow-y-auto">
+                                {statusLog.slice(-2).map((log, i) => (
+                                    <div key={i} className="flex items-center gap-1.5 text-[9px]">
+                                        {log.type === 'done' ? <Check className="h-2.5 w-2.5 shrink-0 text-emerald-400" /> :
+                                         log.type === 'error' ? <AlertCircle className="h-2.5 w-2.5 shrink-0 text-red-400" /> :
+                                         <Loader2 className="h-2.5 w-2.5 shrink-0 animate-spin text-sky-400" />}
+                                        <span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-500' : 'text-zinc-400'}>{log.message}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             <div ref={scrollRef} className="flex-1 overflow-y-auto mb-2 space-y-2">
                 {messages.length === 0 && statusLog.length === 0 && !buildResult && (
                     <div className="flex flex-col items-center justify-center h-full text-center px-4">
