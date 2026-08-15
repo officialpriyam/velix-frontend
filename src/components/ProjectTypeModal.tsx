@@ -175,8 +175,8 @@ export const ProjectTypeModal = ({ isOpen, onClose, onSelect }: ProjectTypeModal
                         <div className="text-[10px] uppercase font-bold text-muted tracking-wider mb-2 md:mb-3 flex items-center gap-2">
                             <Box className="w-3 h-3" /> Platform
                         </div>
-                        {/* Mobile: horizontal scroll */}
-                        <div className="flex md:space-y-1 gap-2 md:gap-0 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 -mx-1 px-1 md:mx-0 md:px-0 scrollbar-none">
+                        {/* Mobile: horizontal scroll, Desktop: vertical stack */}
+                        <div className="flex flex-row md:flex-col gap-2 md:space-y-1 md:gap-0 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 -mx-1 px-1 md:mx-0 md:px-0 scrollbar-none">
                             {platforms.map((platform) => (
                                 <button
                                     key={platform.id}
