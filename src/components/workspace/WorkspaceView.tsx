@@ -892,7 +892,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
             {/* Compile Modal */}
             {activeModal === 'compile' && (
                 <ModalOverlay onClose={() => setActiveModal(null)}>
-                    <div className="w-full max-w-lg neu-card p-5 animate-scale-in" onClick={e => e.stopPropagation()}>
+                    <div className="w-full max-w-lg md:max-w-2xl neu-card p-5 animate-scale-in" onClick={e => e.stopPropagation()}>
                         <ModalHeader title="Build History" onClose={() => setActiveModal(null)} />
                         <div className="neu-inset rounded-xl p-5 mb-5">
                             <div className="flex items-center gap-3 mb-4">
