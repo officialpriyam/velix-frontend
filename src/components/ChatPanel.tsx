@@ -1238,7 +1238,24 @@ export const ChatPanel = ({
                                 )}
                             </div>
                             <div className="flex items-center gap-1">
-                                <button onClick={async () => { const text = buildResult.log || ''; if (await copyToClipboard(text)) showNotification('Copied.', 'success'); else showNotification('Copy failed', 'error'); }} className="p-1 rounded text-muted hover:text-foreground transition-colors" title="Copy log">
+                                <button onClick={async () => {
+                                    const text = buildResult.log || '';
+                                    if (!text) { showNotification('No error to copy', 'error'); return; }
+                                    try {
+                                        await navigator.clipboard.writeText(text);
+                                        showNotification('Copied!', 'success');
+                                    } catch {
+                                        // fallback
+                                        const ta = document.createElement('textarea');
+                                        ta.value = text;
+                                        ta.style.cssText = 'position:fixed;left:-9999px';
+                                        document.body.appendChild(ta);
+                                        ta.select();
+                                        document.execCommand('copy');
+                                        document.body.removeChild(ta);
+                                        showNotification('Copied!', 'success');
+                                    }
+                                }} className="p-1 rounded text-muted hover:text-foreground transition-colors" title="Copy error">
                                     <Copy className="w-3 h-3" />
                                 </button>
                                 <button onClick={onClearBuildResult} className="p-1 rounded text-muted hover:text-foreground transition-colors">
