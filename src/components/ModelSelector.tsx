@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, ChevronDown, Search, Check, Zap, Award } from 'lucide-react';
+import { Sparkles, ChevronDown, Search, Check, Zap, Award, Mic, Volume2 } from 'lucide-react';
 import { aiApi } from '@/lib/api';
 
 export interface ModelItem {
     id: string;
     name: string;
     description?: string;
-    provider?: 'openrouter' | 'nvidia' | 'llmgate' | 'orac' | 'priyx' | 'requesty';
+    provider?: 'openrouter' | 'nvidia' | 'llmgate' | 'orac' | 'priyx' | 'requesty' | 'sarvam';
 }
 
 export interface ModelTiersData {
@@ -97,6 +97,15 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
         if (id === 'orac') return 'orac';
         if (id === 'priyx') return 'Priyx';
         if (id === 'requesty') return 'Requesty';
+        if (id === 'sarvam-105b') return 'Sarvam-105B';
+        if (id === 'sarvam-105b-conversations') return 'Sarvam Conv';
+        if (id === 'saaras:v3') return 'Saaras v3';
+        if (id === 'bulbul:v3') return 'Bulbul v3';
+        if (id === 'mayura') return 'Mayura';
+        if (id === 'sarvam-translate') return 'Sarvam Translate';
+        if (id === 'sarvam-vision') return 'Sarvam Vision';
+        if (id === 'glm-5.2') return 'GLM-5.2';
+        if (id === 'gemma-4-31b') return 'Gemma 4 31B';
         const found = flatModels.find(m => m.id === id);
         if (found) return found.name || found.id;
         return id.split('/').pop()?.replace(/:free/g, '').replace(/-/g, ' ') || id;
@@ -239,6 +248,106 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
                                 ))}
                             </>
                         )}
+
+                        {/* SarvamAI Section */}
+                        {(() => {
+                            const sarvamModels = flatModels.filter(m => m.provider === 'sarvam');
+                            if (sarvamModels.length === 0) return null;
+                            const chatModels = sarvamModels.filter(m => ['sarvam-105b', 'sarvam-105b-conversations', 'glm-5.2', 'gemma-4-31b'].includes(m.id));
+                            const ttsModels = sarvamModels.filter(m => m.id === 'bulbul:v3');
+                            const sttModels = sarvamModels.filter(m => m.id === 'saaras:v3');
+                            const otherModels = sarvamModels.filter(m => !['sarvam-105b', 'sarvam-105b-conversations', 'glm-5.2', 'gemma-4-31b', 'bulbul:v3', 'saaras:v3'].includes(m.id));
+                            return (
+                                <>
+                                    <div className="px-2 pt-2 pb-1 text-[10px] font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1.5">
+                                        <div className="w-4 h-4 rounded bg-orange-500/15 flex items-center justify-center">
+                                            <span className="text-[8px] font-bold text-orange-400">S</span>
+                                        </div>
+                                        SarvamAI
+                                    </div>
+                                    {chatModels.length > 0 && (
+                                        <div className="ml-2 mt-1">
+                                            <div className="px-2 py-0.5 text-[9px] font-medium text-muted/70 uppercase">Chat & Reasoning</div>
+                                            {chatModels.map(m => (
+                                                <button
+                                                    key={m.id}
+                                                    type="button"
+                                                    onClick={() => { onSelectModel(m.id); setIsOpen(false); setExpandedTier(null); }}
+                                                    className={`w-full text-left px-2 py-1.5 rounded-lg text-xs flex items-center gap-2 ${selectedModel === m.id ? 'bg-primary/10 text-foreground font-semibold' : 'text-foreground/70 hover:bg-[hsl(var(--surface-sunk))]'}`}
+                                                >
+                                                    <Sparkles className="w-3 h-3 text-orange-400 shrink-0" />
+                                                    <div className="min-w-0">
+                                                        <div className="truncate font-medium">{m.name}</div>
+                                                        <div className="text-[9px] text-muted truncate">{m.description}</div>
+                                                    </div>
+                                                    {selectedModel === m.id && <Check className="w-3 h-3 text-primary shrink-0 ml-auto" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {sttModels.length > 0 && (
+                                        <div className="ml-2 mt-1">
+                                            <div className="px-2 py-0.5 text-[9px] font-medium text-muted/70 uppercase flex items-center gap-1"><Mic className="w-2.5 h-2.5" /> Speech-to-Text</div>
+                                            {sttModels.map(m => (
+                                                <button
+                                                    key={m.id}
+                                                    type="button"
+                                                    onClick={() => { onSelectModel(m.id); setIsOpen(false); setExpandedTier(null); }}
+                                                    className={`w-full text-left px-2 py-1.5 rounded-lg text-xs flex items-center gap-2 ${selectedModel === m.id ? 'bg-primary/10 text-foreground font-semibold' : 'text-foreground/70 hover:bg-[hsl(var(--surface-sunk))]'}`}
+                                                >
+                                                    <Mic className="w-3 h-3 text-blue-400 shrink-0" />
+                                                    <div className="min-w-0">
+                                                        <div className="truncate font-medium">{m.name}</div>
+                                                        <div className="text-[9px] text-muted truncate">{m.description}</div>
+                                                    </div>
+                                                    {selectedModel === m.id && <Check className="w-3 h-3 text-primary shrink-0 ml-auto" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {ttsModels.length > 0 && (
+                                        <div className="ml-2 mt-1">
+                                            <div className="px-2 py-0.5 text-[9px] font-medium text-muted/70 uppercase flex items-center gap-1"><Volume2 className="w-2.5 h-2.5" /> Text-to-Speech</div>
+                                            {ttsModels.map(m => (
+                                                <button
+                                                    key={m.id}
+                                                    type="button"
+                                                    onClick={() => { onSelectModel(m.id); setIsOpen(false); setExpandedTier(null); }}
+                                                    className={`w-full text-left px-2 py-1.5 rounded-lg text-xs flex items-center gap-2 ${selectedModel === m.id ? 'bg-primary/10 text-foreground font-semibold' : 'text-foreground/70 hover:bg-[hsl(var(--surface-sunk))]'}`}
+                                                >
+                                                    <Volume2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                                                    <div className="min-w-0">
+                                                        <div className="truncate font-medium">{m.name}</div>
+                                                        <div className="text-[9px] text-muted truncate">{m.description}</div>
+                                                    </div>
+                                                    {selectedModel === m.id && <Check className="w-3 h-3 text-primary shrink-0 ml-auto" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {otherModels.length > 0 && (
+                                        <div className="ml-2 mt-1">
+                                            <div className="px-2 py-0.5 text-[9px] font-medium text-muted/70 uppercase">Translation & Vision</div>
+                                            {otherModels.map(m => (
+                                                <button
+                                                    key={m.id}
+                                                    type="button"
+                                                    onClick={() => { onSelectModel(m.id); setIsOpen(false); setExpandedTier(null); }}
+                                                    className={`w-full text-left px-2 py-1.5 rounded-lg text-xs flex items-center gap-2 ${selectedModel === m.id ? 'bg-primary/10 text-foreground font-semibold' : 'text-foreground/70 hover:bg-[hsl(var(--surface-sunk))]'}`}
+                                                >
+                                                    <Sparkles className="w-3 h-3 text-cyan-400 shrink-0" />
+                                                    <div className="min-w-0">
+                                                        <div className="truncate font-medium">{m.name}</div>
+                                                        <div className="text-[9px] text-muted truncate">{m.description}</div>
+                                                    </div>
+                                                    {selectedModel === m.id && <Check className="w-3 h-3 text-primary shrink-0 ml-auto" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
                     </div>
                 </div>
             )}
