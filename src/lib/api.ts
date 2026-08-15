@@ -546,12 +546,12 @@ export const wikiApi = {
         const res = await fetch(`${BASE_URL}/wiki/pages/${pageId}`, { credentials: 'include' });
         return safeJson(res);
     },
-    createPage: async (projectId: string, title: string, slug?: string, content?: string): Promise<WikiPage> => {
+    createPage: async (projectId: string, title: string, slug?: string, content?: string, path?: string): Promise<WikiPage> => {
         const res = await fetch(`${BASE_URL}/wiki/projects/${projectId}/pages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ title, slug, content })
+            body: JSON.stringify({ title, slug, content, path })
         });
         return safeJson(res);
     },
@@ -586,6 +586,15 @@ export const wikiApi = {
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ is_public: isPublic })
+        });
+        return safeJson(res);
+    },
+    gitlabPush: async (projectId: string, data: { gitlab_token: string; gitlab_url?: string; project_name?: string; branch?: string }) => {
+        const res = await fetch(`${BASE_URL}/wiki/projects/${projectId}/gitlab-push`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(data)
         });
         return safeJson(res);
     }

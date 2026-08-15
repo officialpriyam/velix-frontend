@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     ArrowLeft, BookOpen, Notebook, FilePlus, FilePlus2, FolderPlus,
-    Globe, ChevronRight, Trash2, Save, Eye, EyeOff, X, Loader2, Play,
-    ExternalLink, Link2, Unlink, Check, AlertCircle
+    FolderOpen, Globe, ChevronRight, ChevronDown, Trash2, Save, Eye, EyeOff,
+    X, Loader2, Play, ExternalLink, Link2, Unlink, Check, AlertCircle, FileCode
 } from 'lucide-react';
 import { wikiApi, gitbookApi, type WikiPage } from '@/lib/api';
 import { useNotification } from './Notification';
@@ -22,6 +22,58 @@ interface WikiModalProps {
     sessionId: string;
 }
 
+interface FileTreeNode {
+    name: string;
+    type: 'folder' | 'file';
+    page?: WikiPage;
+    children?: FileTreeNode[];
+    path?: string;
+}
+
+function buildFileTree(pages: WikiPage[]): FileTreeNode[] {
+    const folders: Record<string, FileTreeNode> = {};
+    const root: FileTreeNode[] = [];
+
+    for (const page of pages) {
+        const pagePath: string = (page as any).path || '';
+
+        if (pagePath === '_wiki.yml') {
+            root.unshift({ name: '_wiki.yml', type: 'file', page });
+            continue;
+        }
+        if (pagePath === 'index.md') {
+            root.push({ name: 'index.md', type: 'file', page });
+            continue;
+        }
+
+        if (pagePath) {
+            const parts = pagePath.split('/');
+            if (parts.length >= 2) {
+                const folderName = parts[0];
+                if (!folders[folderName]) {
+                    folders[folderName] = { name: folderName, type: 'folder', children: [] };
+                }
+                folders[folderName].children!.push({
+                    name: `${page.slug}.md`,
+                    type: 'file',
+                    page,
+                    path: pagePath
+                });
+            } else {
+                root.push({ name: `${page.slug}.md`, type: 'file', page, path: pagePath });
+            }
+        } else {
+            root.push({ name: `${page.slug}.md`, type: 'file', page });
+        }
+    }
+
+    for (const folder of Object.values(folders)) {
+        root.push(folder);
+    }
+
+    return root;
+}
+
 export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
     const { showNotification } = useNotification();
     const [pages, setPages] = useState<WikiPage[]>([]);
@@ -35,6 +87,7 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
     const [saving, setSaving] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const editorRef = useRef<HTMLTextAreaElement>(null);
+    const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
 
     const [gitbookConnected, setGitbookConnected] = useState(false);
     const [gitbookUserName, setGitbookUserName] = useState('');
@@ -45,6 +98,12 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
     const [gitbookError, setGitbookError] = useState('');
     const [gitbookPushing, setGitbookPushing] = useState(false);
     const [showGitbookPanel, setShowGitbookPanel] = useState(false);
+
+    const [gitlabToken, setGitlabToken] = useState('');
+    const [gitlabUrl, setGitlabUrl] = useState('https://gitlab.com');
+    const [gitlabPushing, setGitlabPushing] = useState(false);
+    const [showGitlabPanel, setShowGitlabPanel] = useState(false);
+    const [gitlabProjectName, setGitlabProjectName] = useState('');
 
     const commands: { type: WikiType; label: string }[] = [
         { type: 'getting-started', label: 'getting-started' },
@@ -93,8 +152,11 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
             setPrompt('');
             setActiveCommand(null);
             setShowGitbookPanel(false);
+            setShowGitlabPanel(false);
             setGitbookToken('');
             setGitbookError('');
+            setGitlabToken('');
+            setGitlabProjectName('');
         }
     }, [isOpen, loadPages, checkGitbookStatus]);
 
@@ -104,13 +166,16 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
         setEditTitle(page.title);
     };
 
-    const handleNewPage = async () => {
+    const handleNewPage = async (folder?: string) => {
         try {
-            const page = await wikiApi.createPage(sessionId, 'Untitled Page');
+            const title = 'Untitled Page';
+            const slug = 'untitled-page';
+            const path = folder ? `${folder}/${slug}` : '';
+            const page = await wikiApi.createPage(sessionId, title, slug, '', path);
             await loadPages();
             setSelectedPage(page);
             setEditContent('');
-            setEditTitle('Untitled Page');
+            setEditTitle(title);
         } catch (err) {
             console.error('Failed to create page:', err);
         }
@@ -125,6 +190,7 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
                 content: editContent
             });
             setSelectedPage({ ...selectedPage, title: editTitle, content: editContent });
+            showNotification('Saved!', 'success');
         } catch (err) {
             console.error('Failed to save page:', err);
         } finally {
@@ -183,6 +249,30 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
             showNotification(err.message || 'Failed to generate wiki', 'error');
         } finally {
             setGenerating(false);
+        }
+    };
+
+    const handleGitlabPush = async () => {
+        if (!gitlabToken.trim()) return;
+        setGitlabPushing(true);
+        try {
+            const result = await wikiApi.gitlabPush(sessionId, {
+                gitlab_token: gitlabToken.trim(),
+                gitlab_url: gitlabUrl.trim() || undefined,
+                project_name: gitlabProjectName.trim() || undefined,
+            });
+            if (result.error) {
+                showNotification(result.error, 'error');
+                return;
+            }
+            showNotification(`Pushed ${result.pushed}/${result.total} files to GitLab!`, 'success');
+            if (result.projectUrl) {
+                window.open(result.projectUrl, '_blank');
+            }
+        } catch (err: any) {
+            showNotification(err.message || 'Failed to push to GitLab', 'error');
+        } finally {
+            setGitlabPushing(false);
         }
     };
 
@@ -257,18 +347,24 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
         }
     };
 
+    const toggleFolder = (name: string) => {
+        setExpandedFolders(prev => ({ ...prev, [name]: !prev[name] }));
+    };
+
+    const fileTree = buildFileTree(pages);
+
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-[80] flex bg-background text-foreground">
             {/* Left Panel: Wiki Generator */}
-            <aside className="flex flex-col border-r border-white/5 w-[420px] shrink-0">
+            <aside className="flex flex-col border-r border-white/5 w-[320px] md:w-[420px] shrink-0">
                 <div className="flex items-center justify-between border-b border-white/5 px-3 py-2 text-xs">
                     <div className="flex items-center gap-2">
                         <Notebook className="w-3.5 h-3.5 text-primary" />
                         <span className="font-medium">Wiki</span>
                         <span className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary font-mono">
-                            {pages.length}
+                            {pages.filter(p => (p as any).path !== '_wiki.yml' && (p as any).path !== 'index.md').length}
                         </span>
                     </div>
                     <button
@@ -280,254 +376,206 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
                     </button>
                 </div>
 
-                <div className="flex flex-1 flex-col p-5 overflow-y-auto">
-                    {/* GitBook Connection Section */}
-                    <div className="mb-5 rounded-xl border border-white/10 bg-white/5 p-4">
-                        <div className="flex items-center justify-between mb-3">
+                <div className="flex flex-1 flex-col p-4 md:p-5 overflow-y-auto">
+                    {/* GitBook Connection */}
+                    <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
+                        <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                                 <Link2 className="w-3.5 h-3.5 text-primary" />
-                                <span className="text-xs font-semibold">GitBook</span>
-                                {gitbookConnected && (
-                                    <span className="inline-flex items-center gap-1 rounded-md bg-success/15 px-1.5 py-0.5 text-[10px] text-success">
-                                        <Check className="w-2.5 h-2.5" /> Connected
-                                    </span>
-                                )}
+                                <span className="text-xs font-semibold">Hosting</span>
                             </div>
-                            {gitbookConnected ? (
-                                <button
-                                    onClick={() => setShowGitbookPanel(!showGitbookPanel)}
-                                    className="text-[10px] text-muted hover:text-foreground transition-colors"
-                                >
-                                    {showGitbookPanel ? 'Hide' : 'Manage'}
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={() => setShowGitbookPanel(!showGitbookPanel)}
-                                    className="text-[10px] text-primary hover:text-primary/80 transition-colors"
-                                >
-                                    Connect
-                                </button>
-                            )}
+                        </div>
+                        <div className="flex gap-1.5">
+                            <button
+                                onClick={() => { setShowGitbookPanel(!showGitbookPanel); setShowGitlabPanel(false); }}
+                                className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-all border ${
+                                    showGitbookPanel ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 bg-white/5 text-muted hover:text-foreground'
+                                }`}
+                            >
+                                {gitbookConnected ? <Check className="w-3 h-3 text-success" /> : <Link2 className="w-3 h-3" />}
+                                GitBook
+                            </button>
+                            <button
+                                onClick={() => { setShowGitlabPanel(!showGitlabPanel); setShowGitbookPanel(false); }}
+                                className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-all border ${
+                                    showGitlabPanel ? 'border-orange-400/40 bg-orange-400/10 text-orange-400' : 'border-white/10 bg-white/5 text-muted hover:text-foreground'
+                                }`}
+                            >
+                                <ExternalLink className="w-3 h-3" />
+                                GitLab
+                            </button>
                         </div>
 
-                        {gitbookConnected ? (
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-[11px] text-muted">
-                                    <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center text-[9px] font-bold text-primary">
-                                        {gitbookUserName.charAt(0).toUpperCase()}
-                                    </div>
-                                    <span className="truncate">{gitbookUserName}</span>
-                                </div>
-
-                                {showGitbookPanel && (
+                        {showGitbookPanel && (
+                            <div className="mt-3 space-y-2">
+                                {gitbookConnected ? (
                                     <>
-                                        {gitbookOrgs.length > 0 && (
-                                            <div className="mt-2">
-                                                <label className="text-[10px] text-muted mb-1 block">Organization</label>
-                                                <select
-                                                    value={selectedOrg}
-                                                    onChange={e => setSelectedOrg(e.target.value)}
-                                                    className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary/40"
-                                                >
-                                                    {gitbookOrgs.map(org => (
-                                                        <option key={org.id} value={org.id}>{org.name}</option>
-                                                    ))}
-                                                </select>
+                                        <div className="flex items-center gap-2 text-[11px] text-muted">
+                                            <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center text-[9px] font-bold text-primary">
+                                                {gitbookUserName.charAt(0).toUpperCase()}
                                             </div>
+                                            <span className="truncate">{gitbookUserName}</span>
+                                        </div>
+                                        {gitbookOrgs.length > 0 && (
+                                            <select value={selectedOrg} onChange={e => setSelectedOrg(e.target.value)}
+                                                className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none">
+                                                {gitbookOrgs.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}
+                                            </select>
                                         )}
-
-                                        <div className="flex gap-2 mt-2">
-                                            <button
-                                                onClick={handleGitbookPush}
-                                                disabled={gitbookPushing || pages.length === 0}
-                                                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-primary/20 px-3 py-1.5 text-[11px] font-medium text-primary hover:bg-primary/30 transition-all disabled:opacity-50"
-                                            >
+                                        <div className="flex gap-2">
+                                            <button onClick={handleGitbookPush} disabled={gitbookPushing || pages.length === 0}
+                                                className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-primary/20 px-2 py-1.5 text-[10px] font-medium text-primary hover:bg-primary/30 disabled:opacity-50">
                                                 {gitbookPushing ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
                                                 {gitbookPushing ? 'Pushing...' : `Push ${pages.length} pages`}
                                             </button>
-                                            <button
-                                                onClick={handleGitbookDisconnect}
-                                                className="flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-muted hover:text-danger hover:border-danger/30 transition-all"
-                                            >
+                                            <button onClick={handleGitbookDisconnect}
+                                                className="flex items-center justify-center rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[10px] text-muted hover:text-danger">
                                                 <Unlink className="w-3 h-3" />
                                             </button>
                                         </div>
                                     </>
+                                ) : (
+                                    <>
+                                        <div className="text-[10px] text-muted leading-relaxed">
+                                            Go to <a href="https://app.gitbook.com/account/developer" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">GitBook Developer Settings</a> and generate a PAT.
+                                        </div>
+                                        <input type="password" value={gitbookToken} onChange={e => { setGitbookToken(e.target.value); setGitbookError(''); }}
+                                            placeholder="Paste GitBook access token..." className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-primary/40 placeholder:text-faint" />
+                                        {gitbookError && <div className="flex items-center gap-1 text-[10px] text-danger"><AlertCircle className="w-3 h-3" />{gitbookError}</div>}
+                                        <button onClick={handleGitbookConnect} disabled={gitbookLoading || !gitbookToken.trim()}
+                                            className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-primary px-2 py-1.5 text-[11px] font-medium text-background hover:opacity-90 disabled:opacity-50">
+                                            {gitbookLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
+                                            {gitbookLoading ? 'Validating...' : 'Connect'}
+                                        </button>
+                                    </>
                                 )}
                             </div>
-                        ) : (
-                            showGitbookPanel && (
-                                <div className="mt-3 space-y-2">
-                                    <div className="text-[10px] text-muted leading-relaxed">
-                                        Go to{' '}
-                                        <a href="https://app.gitbook.com/account/developer" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                                            GitBook Developer Settings
-                                        </a>
-                                        {' '}and generate a Personal Access Token.
-                                    </div>
-                                    <input
-                                        type="password"
-                                        value={gitbookToken}
-                                        onChange={e => { setGitbookToken(e.target.value); setGitbookError(''); }}
-                                        placeholder="Paste your GitBook access token..."
-                                        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-foreground outline-none focus:border-primary/40 placeholder:text-faint"
-                                    />
-                                    {gitbookError && (
-                                        <div className="flex items-center gap-1.5 text-[10px] text-danger">
-                                            <AlertCircle className="w-3 h-3" />
-                                            {gitbookError}
-                                        </div>
-                                    )}
-                                    <button
-                                        onClick={handleGitbookConnect}
-                                        disabled={gitbookLoading || !gitbookToken.trim()}
-                                        className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-background hover:opacity-90 transition-all disabled:opacity-50"
-                                    >
-                                        {gitbookLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
-                                        {gitbookLoading ? 'Validating...' : 'Connect GitBook'}
-                                    </button>
+                        )}
+
+                        {showGitlabPanel && (
+                            <div className="mt-3 space-y-2">
+                                <div className="text-[10px] text-muted leading-relaxed">
+                                    Enter a GitLab Personal Access Token with <code className="text-primary">api</code> scope.
                                 </div>
-                            )
+                                <input type="text" value={gitlabUrl} onChange={e => setGitlabUrl(e.target.value)}
+                                    placeholder="https://gitlab.com" className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
+                                <input type="text" value={gitlabProjectName} onChange={e => setGitlabProjectName(e.target.value)}
+                                    placeholder="Project name (optional)" className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
+                                <input type="password" value={gitlabToken} onChange={e => setGitlabToken(e.target.value)}
+                                    placeholder="Paste GitLab access token..." className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
+                                <button onClick={handleGitlabPush} disabled={gitlabPushing || !gitlabToken.trim()}
+                                    className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-orange-500 px-2 py-1.5 text-[11px] font-medium text-white hover:bg-orange-600 disabled:opacity-50 transition-all">
+                                    {gitlabPushing ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
+                                    {gitlabPushing ? 'Pushing...' : `Push ${pages.length} pages to GitLab`}
+                                </button>
+                            </div>
                         )}
                     </div>
 
-                    {/* Generator - always visible */}
-                    <>
-                            {/* Generator */}
-                            <div className="flex flex-col items-center justify-center text-center">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-primary">
-                                    <Notebook className="w-5 h-5" />
-                                </div>
-                                <div className="mt-3 text-base font-semibold">Generate Documentation</div>
-                                <div className="text-xs text-muted">Describe what you want to create</div>
-                            </div>
+                    {/* Generator */}
+                    <div className="flex flex-col items-center justify-center text-center">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-primary">
+                            <Notebook className="w-4 h-4" />
+                        </div>
+                        <div className="mt-2 text-sm font-semibold">Generate Documentation</div>
+                        <div className="text-[10px] text-muted">Describe what you want to create</div>
+                    </div>
 
-                            <div className="mt-6 text-[11px] text-muted">
-                                <span className="text-foreground">$</span> velix wiki{' '}
-                                <span className="text-primary">--generate</span>
-                                <span className="float-right inline-flex items-center gap-1 text-foreground">
-                                    5 credits
-                                </span>
-                            </div>
+                    <div className="mt-4 text-[10px] text-muted">
+                        <span className="text-foreground">$</span> velix wiki{' '}
+                        <span className="text-primary">--generate</span>
+                        <span className="float-right text-primary font-medium">5 credits</span>
+                    </div>
 
-                            <div className="mt-2 rounded-xl border border-white/10 bg-white/5 p-3">
-                                <div className="text-[11px] text-muted">
-                                    <ChevronRight className="mr-1 inline h-3 w-3" />
-                                    Create a getting started guide for my plugin...
-                                </div>
-                                <textarea
-                                    ref={textareaRef}
-                                    rows={4}
-                                    value={prompt}
-                                    onChange={(e) => setPrompt(e.target.value)}
-                                    onKeyDown={handleKeyDown}
-                                    className="mt-1 w-full resize-none bg-transparent text-sm outline-none placeholder:text-faint"
-                                    placeholder="Describe what documentation to generate..."
-                                />
-                                <div className="mt-1 flex items-center justify-between text-[11px] text-muted">
-                                    <span>{prompt.length}/2000</span>
-                                    <div className="flex items-center gap-2">
-                                        <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5">Ctrl+Enter</kbd>
-                                        <span>to run</span>
-                                        <button
-                                            onClick={() => handleGenerate(activeCommand || undefined)}
-                                            disabled={generating || (!prompt.trim() && !activeCommand)}
-                                            className="ml-2 inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-0.5 text-xs hover:bg-white/15 transition-colors disabled:opacity-50"
-                                        >
-                                            {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />} Run
-                                        </button>
-                                    </div>
-                                </div>
+                    <div className="mt-2 rounded-xl border border-white/10 bg-white/5 p-3">
+                        <textarea
+                            ref={textareaRef}
+                            rows={4}
+                            value={prompt}
+                            onChange={(e) => setPrompt(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            className="w-full resize-none bg-transparent text-xs outline-none placeholder:text-faint"
+                            placeholder="Describe what documentation to generate..."
+                        />
+                        <div className="mt-1 flex items-center justify-between text-[10px] text-muted">
+                            <span>{prompt.length}/2000</span>
+                            <div className="flex items-center gap-2">
+                                <kbd className="rounded border border-white/10 bg-white/5 px-1 py-0.5 text-[9px]">Ctrl+Enter</kbd>
+                                <button
+                                    onClick={() => handleGenerate(activeCommand || undefined)}
+                                    disabled={generating || (!prompt.trim() && !activeCommand)}
+                                    className="inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-0.5 text-[11px] hover:bg-white/15 disabled:opacity-50"
+                                >
+                                    {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />} Run
+                                </button>
                             </div>
+                        </div>
+                    </div>
 
-                            <div className="mt-5 text-[11px] text-muted"># quick commands</div>
-                            <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                                {commands.map((c) => (
-                                    <button
-                                        key={c.type}
-                                        onClick={() => {
-                                            setActiveCommand(activeCommand === c.type ? null : c.type);
-                                            setPrompt(`Generate ${c.label} documentation for my project`);
-                                        }}
-                                        className={`rounded-md border px-3 py-2 text-left transition-all ${
-                                            activeCommand === c.type
-                                                ? 'border-primary/40 bg-primary/10 text-foreground'
-                                                : 'border-white/10 bg-white/5 text-foreground/90 hover:bg-white/10'
-                                        }`}
-                                    >
-                                        <Globe className="mr-2 inline h-3 w-3 text-primary" />
-                                        {c.label}
-                                    </button>
-                                ))}
-                            </div>
-                    </>
+                    <div className="mt-4 text-[10px] text-muted"># quick commands</div>
+                    <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px]">
+                        {commands.map((c) => (
+                            <button
+                                key={c.type}
+                                onClick={() => {
+                                    setActiveCommand(activeCommand === c.type ? null : c.type);
+                                    setPrompt(`Generate ${c.label} documentation for my project`);
+                                }}
+                                className={`rounded-md border px-2.5 py-2 text-left transition-all ${
+                                    activeCommand === c.type
+                                        ? 'border-primary/40 bg-primary/10 text-foreground'
+                                        : 'border-white/10 bg-white/5 text-foreground/90 hover:bg-white/10'
+                                }`}
+                            >
+                                <Globe className="mr-1.5 inline h-3 w-3 text-primary" />
+                                {c.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                <div className="border-t border-white/5 px-4 py-2 text-[11px] text-muted">
-                    {pages.length} pages
+                <div className="border-t border-white/5 px-4 py-2 text-[10px] text-muted">
+                    {pages.filter(p => (p as any).path !== '_wiki.yml' && (p as any).path !== 'index.md').length} pages
                 </div>
             </aside>
 
-            {/* Center Panel: Wiki Files */}
-            <div className="flex flex-col border-r border-white/5 w-[260px] shrink-0">
+            {/* Center Panel: Wiki Files - Tree View */}
+            <div className="flex flex-col border-r border-white/5 w-[220px] md:w-[260px] shrink-0">
                 <div className="flex items-center justify-between border-b border-white/5 px-3 py-2 text-xs">
                     <span className="flex items-center gap-1.5 text-muted">
                         <FilePlus2 className="w-3.5 h-3.5" /> Wiki Files
                     </span>
+                    <button
+                        onClick={() => handleNewPage()}
+                        className="p-1 rounded hover:bg-white/10 text-muted hover:text-foreground transition-colors"
+                        title="New file"
+                    >
+                        <FilePlus className="w-3.5 h-3.5" />
+                    </button>
                 </div>
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto p-2">
                     {pages.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/5">
-                                <FolderPlus className="w-6 h-6 text-muted/70" />
+                        <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/5">
+                                <FolderPlus className="w-5 h-5 text-muted/70" />
                             </div>
-                            <div className="text-sm font-medium">No files yet</div>
-                            <div className="text-xs text-muted">Start by creating your first file</div>
-                            <div className="mt-2 flex w-full flex-col gap-2">
-                                <button
-                                    onClick={handleNewPage}
-                                    className="flex items-center justify-center gap-2 rounded-md bg-success/90 px-3 py-1.5 text-xs font-medium text-background hover:bg-success transition-colors"
-                                >
-                                    <FilePlus className="w-3.5 h-3.5" /> New File
-                                </button>
-                            </div>
+                            <div className="text-xs font-medium">No files yet</div>
+                            <div className="text-[10px] text-muted">Generate documentation to start</div>
                         </div>
                     ) : (
-                        <div className="p-2 space-y-0.5">
-                            {pages.map((page) => (
-                                <div
-                                    key={page.id}
-                                    onClick={() => handleSelectPage(page)}
-                                    className={`group flex items-center justify-between rounded-lg px-3 py-2 cursor-pointer transition-all ${
-                                        selectedPage?.id === page.id
-                                            ? 'bg-primary/10 text-foreground'
-                                            : 'text-muted hover:bg-white/5 hover:text-foreground'
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <Notebook className="w-3.5 h-3.5 shrink-0" />
-                                        <span className="text-xs truncate">{page.title}</span>
-                                        {page.is_public ? (
-                                            <Globe className="w-3 h-3 text-success shrink-0" />
-                                        ) : null}
-                                    </div>
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleTogglePublic(page); }}
-                                            className="p-1 rounded hover:bg-white/10 transition-colors"
-                                            title={page.is_public ? 'Make private' : 'Make public'}
-                                        >
-                                            {page.is_public ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                                        </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleDelete(page.id); }}
-                                            className="p-1 rounded hover:bg-white/10 text-danger transition-colors"
-                                            title="Delete page"
-                                        >
-                                            <Trash2 className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                </div>
+                        <div className="space-y-0.5">
+                            {fileTree.map((node) => (
+                                <TreeNode
+                                    key={node.name}
+                                    node={node}
+                                    depth={0}
+                                    selectedPage={selectedPage}
+                                    expandedFolders={expandedFolders}
+                                    onToggleFolder={toggleFolder}
+                                    onSelectPage={handleSelectPage}
+                                    onDeletePage={handleDelete}
+                                    onTogglePublic={handleTogglePublic}
+                                />
                             ))}
                         </div>
                     )}
@@ -541,12 +589,12 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
                         <BookOpen className="w-3.5 h-3.5" /> Wiki Editor
                     </span>
                     <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-muted">{pages.length} pages</span>
+                        <span className="text-[10px] text-muted">{pages.length} files</span>
                         {selectedPage && (
                             <button
                                 onClick={handleSave}
                                 disabled={saving}
-                                className="inline-flex items-center gap-1 rounded-md bg-primary/20 px-2 py-1 text-[11px] text-primary hover:bg-primary/30 transition-colors disabled:opacity-50"
+                                className="inline-flex items-center gap-1 rounded-md bg-primary/20 px-2 py-1 text-[10px] text-primary hover:bg-primary/30 disabled:opacity-50"
                             >
                                 {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                                 {saving ? 'Saving...' : 'Save'}
@@ -562,7 +610,7 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
                                 type="text"
                                 value={editTitle}
                                 onChange={(e) => setEditTitle(e.target.value)}
-                                className="w-full bg-transparent text-lg font-semibold outline-none placeholder:text-faint"
+                                className="w-full bg-transparent text-base font-semibold outline-none placeholder:text-faint"
                                 placeholder="Page title..."
                             />
                         </div>
@@ -571,7 +619,7 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
                                 ref={editorRef}
                                 value={editContent}
                                 onChange={(e) => setEditContent(e.target.value)}
-                                className="w-full h-full resize-none bg-transparent p-4 text-sm font-mono leading-relaxed outline-none placeholder:text-faint"
+                                className="w-full h-full resize-none bg-transparent p-4 text-xs font-mono leading-relaxed outline-none placeholder:text-faint"
                                 placeholder="Write your documentation in Markdown..."
                             />
                         </div>
@@ -583,6 +631,94 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+function TreeNode({
+    node, depth, selectedPage, expandedFolders, onToggleFolder, onSelectPage, onDeletePage, onTogglePublic
+}: {
+    node: FileTreeNode;
+    depth: number;
+    selectedPage: WikiPage | null;
+    expandedFolders: Record<string, boolean>;
+    onToggleFolder: (name: string) => void;
+    onSelectPage: (page: WikiPage) => void;
+    onDeletePage: (pageId: string) => void;
+    onTogglePublic: (page: WikiPage) => void;
+}) {
+    const isExpanded = expandedFolders[node.name] !== false;
+
+    if (node.type === 'folder') {
+        return (
+            <div>
+                <div
+                    onClick={() => onToggleFolder(node.name)}
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer text-muted hover:bg-white/5 hover:text-foreground transition-all"
+                    style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                >
+                    {isExpanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
+                    {isExpanded ? <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" /> : <FolderPlus className="w-3.5 h-3.5 text-primary shrink-0" />}
+                    <span className="text-xs font-medium truncate">{node.name}</span>
+                </div>
+                {isExpanded && node.children && (
+                    <div>
+                        {node.children.map((child) => (
+                            <TreeNode
+                                key={child.name}
+                                node={child}
+                                depth={depth + 1}
+                                selectedPage={selectedPage}
+                                expandedFolders={expandedFolders}
+                                onToggleFolder={onToggleFolder}
+                                onSelectPage={onSelectPage}
+                                onDeletePage={onDeletePage}
+                                onTogglePublic={onTogglePublic}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    const isSelected = selectedPage?.id === node.page?.id;
+    const isYaml = node.name === '_wiki.yml';
+    const isIndex = node.name === 'index.md';
+
+    return (
+        <div
+            onClick={() => node.page && onSelectPage(node.page)}
+            className={`group flex items-center justify-between rounded-md px-2 py-1.5 cursor-pointer transition-all ${
+                isSelected ? 'bg-primary/10 text-foreground' : 'text-muted hover:bg-white/5 hover:text-foreground'
+            }`}
+            style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        >
+            <div className="flex items-center gap-1.5 min-w-0">
+                <FileCode className={`w-3.5 h-3.5 shrink-0 ${isYaml ? 'text-amber-400' : isIndex ? 'text-blue-400' : ''}`} />
+                <span className={`text-xs truncate ${isYaml || isIndex ? 'font-medium' : ''}`}>{node.name}</span>
+                {node.page && (node.page as any).is_public ? (
+                    <Globe className="w-2.5 h-2.5 text-success shrink-0" />
+                ) : null}
+            </div>
+            {node.page && (
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onTogglePublic(node.page!); }}
+                        className="p-0.5 rounded hover:bg-white/10 transition-colors"
+                        title={(node.page as any).is_public ? 'Make private' : 'Make public'}
+                    >
+                        {(node.page as any).is_public ? <EyeOff className="w-2.5 h-2.5" /> : <Eye className="w-2.5 h-2.5" />}
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onDeletePage(node.page!.id); }}
+                        className="p-0.5 rounded hover:bg-white/10 text-danger transition-colors"
+                        title="Delete"
+                    >
+                        <Trash2 className="w-2.5 h-2.5" />
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
