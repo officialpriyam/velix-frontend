@@ -172,7 +172,7 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
     const depsFileInputRef = useRef<HTMLInputElement>(null);
 
     // Settings sub-states
-    const [autoCompile, setAutoCompile] = useState(false);
+    const [autoCompile, setAutoCompile] = useState(true);
     const [stopOnError, setStopOnError] = useState(true);
     const [useBuildVersion, setUseBuildVersion] = useState(false);
     const [javaVersion, setJavaVersion] = useState('21');
@@ -390,6 +390,10 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
             if (result.files?.length > 0 && !selectedFile) setSelectedFile(result.files[0].path);
         }
         setTimeout(() => loadVersionStats(), 1000);
+        // Auto-compile after code generation if enabled
+        if (autoCompile && result.files?.length > 0) {
+            setTimeout(() => handleRun(), 500);
+        }
     };
 
     const selectedFileRef = useRef(selectedFile);
