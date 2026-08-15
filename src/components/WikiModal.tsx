@@ -104,6 +104,18 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
     const [gitlabPushing, setGitlabPushing] = useState(false);
     const [showGitlabPanel, setShowGitlabPanel] = useState(false);
     const [gitlabProjectName, setGitlabProjectName] = useState('');
+    const [gitlabConnected, setGitlabConnected] = useState(false);
+
+    // Load saved GitLab token from localStorage on mount
+    useEffect(() => {
+        const savedToken = localStorage.getItem('velix_gitlab_token');
+        const savedUrl = localStorage.getItem('velix_gitlab_url');
+        if (savedToken) {
+            setGitlabToken(savedToken);
+            setGitlabConnected(true);
+        }
+        if (savedUrl) setGitlabUrl(savedUrl);
+    }, []);
 
     const commands: { type: WikiType; label: string }[] = [
         { type: 'getting-started', label: 'getting-started' },
@@ -261,6 +273,10 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
                 gitlab_url: gitlabUrl.trim() || undefined,
                 project_name: gitlabProjectName.trim() || undefined,
             });
+            // Save token to localStorage on success
+            localStorage.setItem('velix_gitlab_token', gitlabToken.trim());
+            localStorage.setItem('velix_gitlab_url', gitlabUrl.trim() || 'https://gitlab.com');
+            setGitlabConnected(true);
             if (result.errors && result.errors.length > 0) {
                 showNotification(`Pushed ${result.pushed}/${result.total} files (${result.errors.length} failed): ${result.errors[0]}`, 'error');
             } else {
@@ -274,6 +290,14 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
         } finally {
             setGitlabPushing(false);
         }
+    };
+
+    const handleGitlabDisconnect = () => {
+        localStorage.removeItem('velix_gitlab_token');
+        localStorage.removeItem('velix_gitlab_url');
+        setGitlabToken('');
+        setGitlabConnected(false);
+        showNotification('GitLab disconnected', 'success');
     };
 
     const handleGitbookConnect = async () => {
@@ -454,20 +478,44 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
 
                         {showGitlabPanel && (
                             <div className="mt-3 space-y-2">
-                                <div className="text-[10px] text-muted leading-relaxed">
-                                    Enter a GitLab Personal Access Token with <code className="text-primary">api</code> scope.
-                                </div>
-                                <input type="text" value={gitlabUrl} onChange={e => setGitlabUrl(e.target.value)}
-                                    placeholder="https://gitlab.com" className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
-                                <input type="text" value={gitlabProjectName} onChange={e => setGitlabProjectName(e.target.value)}
-                                    placeholder="Project name (optional)" className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
-                                <input type="password" value={gitlabToken} onChange={e => setGitlabToken(e.target.value)}
-                                    placeholder="Paste GitLab access token..." className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
-                                <button onClick={handleGitlabPush} disabled={gitlabPushing || !gitlabToken.trim()}
-                                    className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-orange-500 px-2 py-1.5 text-[11px] font-medium text-white hover:bg-orange-600 disabled:opacity-50 transition-all">
-                                    {gitlabPushing ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
-                                    {gitlabPushing ? 'Pushing...' : `Push ${pages.length} pages to GitLab`}
-                                </button>
+                                {gitlabConnected ? (
+                                    <>
+                                        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20">
+                                            <Check className="w-3 h-3 text-green-400" />
+                                            <span className="text-[10px] text-green-400 font-medium">GitLab Connected</span>
+                                        </div>
+                                        <input type="text" value={gitlabProjectName} onChange={e => setGitlabProjectName(e.target.value)}
+                                            placeholder="Project name (optional)" className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
+                                        <div className="flex gap-2">
+                                            <button onClick={handleGitlabPush} disabled={gitlabPushing}
+                                                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-orange-500 px-2 py-1.5 text-[11px] font-medium text-white hover:bg-orange-600 disabled:opacity-50 transition-all">
+                                                {gitlabPushing ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
+                                                {gitlabPushing ? 'Pushing...' : `Push ${pages.length} pages`}
+                                            </button>
+                                            <button onClick={handleGitlabDisconnect}
+                                                className="px-2 py-1.5 text-[10px] text-muted hover:text-red-400 rounded-lg border border-white/10 hover:border-red-500/20 transition-all">
+                                                Disconnect
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="text-[10px] text-muted leading-relaxed">
+                                            Enter a GitLab Personal Access Token with <code className="text-primary">api</code> scope.
+                                        </div>
+                                        <input type="text" value={gitlabUrl} onChange={e => setGitlabUrl(e.target.value)}
+                                            placeholder="https://gitlab.com" className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
+                                        <input type="text" value={gitlabProjectName} onChange={e => setGitlabProjectName(e.target.value)}
+                                            placeholder="Project name (optional)" className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
+                                        <input type="password" value={gitlabToken} onChange={e => setGitlabToken(e.target.value)}
+                                            placeholder="Paste GitLab access token..." className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
+                                        <button onClick={handleGitlabPush} disabled={gitlabPushing || !gitlabToken.trim()}
+                                            className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-orange-500 px-2 py-1.5 text-[11px] font-medium text-white hover:bg-orange-600 disabled:opacity-50 transition-all">
+                                            {gitlabPushing ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
+                                            {gitlabPushing ? 'Pushing...' : `Push ${pages.length} pages to GitLab`}
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>
