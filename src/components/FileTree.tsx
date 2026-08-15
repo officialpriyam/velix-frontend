@@ -30,6 +30,70 @@ interface ContextMenu {
     path?: string;
 }
 
+const FILE_COLORS: Record<string, { icon: string; bg: string }> = {
+    'java': { icon: 'text-orange-400', bg: 'bg-orange-500/10' },
+    'js': { icon: 'text-yellow-400', bg: 'bg-yellow-500/10' },
+    'ts': { icon: 'text-blue-400', bg: 'bg-blue-500/10' },
+    'tsx': { icon: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+    'jsx': { icon: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+    'py': { icon: 'text-green-400', bg: 'bg-green-500/10' },
+    'html': { icon: 'text-orange-500', bg: 'bg-orange-500/10' },
+    'css': { icon: 'text-purple-400', bg: 'bg-purple-500/10' },
+    'json': { icon: 'text-yellow-300', bg: 'bg-yellow-500/10' },
+    'yml': { icon: 'text-pink-400', bg: 'bg-pink-500/10' },
+    'yaml': { icon: 'text-pink-400', bg: 'bg-pink-500/10' },
+    'md': { icon: 'text-blue-300', bg: 'bg-blue-500/10' },
+    'xml': { icon: 'text-orange-300', bg: 'bg-orange-500/10' },
+    'gradle': { icon: 'text-green-300', bg: 'bg-green-500/10' },
+    'kt': { icon: 'text-purple-300', bg: 'bg-purple-500/10' },
+    'rs': { icon: 'text-red-400', bg: 'bg-red-500/10' },
+    'go': { icon: 'text-cyan-300', bg: 'bg-cyan-500/10' },
+    'zip': { icon: 'text-orange-400', bg: 'bg-orange-500/10' },
+    'jar': { icon: 'text-red-300', bg: 'bg-red-500/10' },
+    'png': { icon: 'text-pink-400', bg: 'bg-pink-500/10' },
+    'jpg': { icon: 'text-pink-400', bg: 'bg-pink-500/10' },
+    'gif': { icon: 'text-pink-400', bg: 'bg-pink-500/10' },
+    'svg': { icon: 'text-green-400', bg: 'bg-green-500/10' },
+    'txt': { icon: 'text-zinc-400', bg: 'bg-zinc-500/10' },
+    'log': { icon: 'text-zinc-500', bg: 'bg-zinc-500/10' },
+    'sql': { icon: 'text-blue-500', bg: 'bg-blue-500/10' },
+    'sh': { icon: 'text-green-300', bg: 'bg-green-500/10' },
+    'bat': { icon: 'text-green-300', bg: 'bg-green-500/10' },
+};
+
+const FOLDER_COLORS: Record<string, { icon: string; bg: string }> = {
+    'src': { icon: 'text-blue-400', bg: 'bg-blue-500/10' },
+    'main': { icon: 'text-blue-400', bg: 'bg-blue-500/10' },
+    'test': { icon: 'text-green-400', bg: 'bg-green-500/10' },
+    'tests': { icon: 'text-green-400', bg: 'bg-green-500/10' },
+    'resources': { icon: 'text-yellow-400', bg: 'bg-yellow-500/10' },
+    'config': { icon: 'text-purple-400', bg: 'bg-purple-500/10' },
+    'lib': { icon: 'text-orange-400', bg: 'bg-orange-500/10' },
+    'build': { icon: 'text-red-400', bg: 'bg-red-500/10' },
+    'dist': { icon: 'text-red-400', bg: 'bg-red-500/10' },
+    'node_modules': { icon: 'text-zinc-500', bg: 'bg-zinc-500/10' },
+    'public': { icon: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+    'assets': { icon: 'text-pink-400', bg: 'bg-pink-500/10' },
+    'components': { icon: 'text-cyan-300', bg: 'bg-cyan-500/10' },
+    'utils': { icon: 'text-yellow-300', bg: 'bg-yellow-500/10' },
+    'hooks': { icon: 'text-purple-300', bg: 'bg-purple-500/10' },
+    'services': { icon: 'text-blue-300', bg: 'bg-blue-500/10' },
+    'models': { icon: 'text-orange-300', bg: 'bg-orange-500/10' },
+    'routes': { icon: 'text-green-300', bg: 'bg-green-500/10' },
+    'middleware': { icon: 'text-pink-300', bg: 'bg-pink-500/10' },
+    'java': { icon: 'text-orange-400', bg: 'bg-orange-500/10' },
+    'com': { icon: 'text-orange-400', bg: 'bg-orange-500/10' },
+};
+
+function getFileColor(name: string): { icon: string; bg: string } {
+    const ext = name.split('.').pop()?.toLowerCase() || '';
+    return FILE_COLORS[ext] || { icon: 'text-muted', bg: '' };
+}
+
+function getFolderColor(name: string): { icon: string; bg: string } {
+    return FOLDER_COLORS[name] || { icon: 'text-primary', bg: '' };
+}
+
 export const FileTree = ({
     sessionId,
     files,
@@ -203,12 +267,21 @@ export const FileTree = ({
                         {node.type === 'folder' ? (
                             <div className="flex items-center">
                                 {isExpanded ? <ChevronDown className="w-3.5 h-3.5 shrink-0 mr-1 text-muted" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0 mr-1 text-muted" />}
-                                <Folder className={`w-4 h-4 shrink-0 transition-colors ${isExpanded ? 'text-primary' : 'text-primary/70'}`} />
+                                <div className={`p-0.5 rounded ${getFolderColor(node.name).bg}`}>
+                                    <Folder className={`w-4 h-4 shrink-0 transition-colors ${isExpanded ? getFolderColor(node.name).icon : getFolderColor(node.name).icon + '/70'}`} />
+                                </div>
                             </div>
                         ) : (
                             <div className="flex items-center ml-4.5">
-                                {isZip ? <FileArchive className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-orange-400' : 'text-orange-500/70'}`} /> :
-                                    <File className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-primary' : 'text-muted'}`} />}
+                                {isZip ? (
+                                    <div className={`p-0.5 rounded ${getFileColor(node.name).bg}`}>
+                                        <FileArchive className={`w-3.5 h-3.5 shrink-0 ${getFileColor(node.name).icon}`} />
+                                    </div>
+                                ) : (
+                                    <div className={`p-0.5 rounded ${getFileColor(node.name).bg}`}>
+                                        <File className={`w-3.5 h-3.5 shrink-0 ${isSelected ? getFileColor(node.name).icon : getFileColor(node.name).icon + '/70'}`} />
+                                    </div>
+                                )}
                             </div>
                         )}
                         <span className={`truncate text-xs ${isSelected ? 'font-semibold' : 'font-medium'}`}>{node.name}</span>

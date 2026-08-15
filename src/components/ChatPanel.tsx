@@ -101,16 +101,6 @@ function parseMetadata(metadata: any) {
     return metadata;
 }
 
-function AgentActivityTimeline({ logs, loading }: { logs: { message: string; type: 'pending' | 'done' | 'error' }[]; loading: boolean }) {
-    const [expanded, setExpanded] = useState(false);
-    useEffect(() => { if (loading) setExpanded(true); }, [loading]);
-    if (!logs.length) return null;
-    return <section className="mx-5 mb-3 overflow-hidden rounded-lg border border-white/[.09] bg-[#10151b] shadow-[0_12px_32px_rgba(0,0,0,.16)]">
-        <button type="button" onClick={() => setExpanded(!expanded)} className="flex w-full items-center justify-between border-b border-white/[.06] px-3 py-2 text-left hover:bg-white/[.02]"><span className="flex items-center gap-2"><Brain className={`h-3.5 w-3.5 ${loading ? 'animate-pulse text-violet-300' : 'text-sky-300'}`} /><span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">AI reasoning</span><span className="text-[10px] text-zinc-500">{loading ? 'Thinking…' : 'Complete'}</span></span><span className="flex items-center gap-2 text-[10px] text-zinc-500"><ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? '' : '-rotate-90'}`} /></span></button>
-        {expanded && <div className="divide-y divide-white/[.055]">{logs.map((log, i) => <div key={`${log.message}-${i}`} className="flex items-center gap-2 px-3 py-2 text-[11px]">{log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}<span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}>{log.message}</span></div>)}</div>}
-    </section>;
-}
-
 export const ChatPanel = ({
     sessionId,
     onCodeGenerated,
@@ -1096,12 +1086,6 @@ export const ChatPanel = ({
                     </div>
                 )}
 
-                {loading && statusLog.length > 0 && (
-                    <div className="sticky top-0 z-10 px-5 pt-2 -mt-2">
-                        <AgentActivityTimeline logs={statusLog} loading />
-                    </div>
-                )}
-                {!loading && <AgentActivityTimeline logs={statusLog} loading={false} />}
                 {/* Legacy source pills are retained only for backwards-compatible DOM styling. */}
                 {(searchStatus?.queries.length || 0) > 0 && (
                     <div className="mx-2 mb-2 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 animate-in fade-in duration-200">
@@ -1209,7 +1193,7 @@ export const ChatPanel = ({
                                 )}
                             </div>
                             <div className="flex items-center gap-1">
-                                <button onClick={async () => { if (await copyToClipboard(buildResult.log || '')) showNotification('Copied.', 'success'); else showNotification('Copy failed', 'error'); }} className="p-1 rounded text-muted hover:text-foreground transition-colors" title="Copy log">
+                                <button onClick={async () => { const text = buildResult.log || ''; if (await copyToClipboard(text)) showNotification('Copied.', 'success'); else showNotification('Copy failed', 'error'); }} className="p-1 rounded text-muted hover:text-foreground transition-colors" title="Copy log">
                                     <Copy className="w-3 h-3" />
                                 </button>
                                 <button onClick={onClearBuildResult} className="p-1 rounded text-muted hover:text-foreground transition-colors">
@@ -1218,8 +1202,15 @@ export const ChatPanel = ({
                             </div>
                         </div>
                         {buildResult.log && (
-                            <div className="px-3 py-2 max-h-[150px] overflow-y-auto bg-[hsl(var(--surface))]/50">
-                                <pre className="text-[10px] font-mono leading-relaxed text-muted whitespace-pre-wrap break-words">{buildResult.log}</pre>
+                            <div className="px-3 py-2 max-h-[60px] overflow-y-auto bg-[hsl(var(--surface))]/50">
+                                {buildResult.log.split('\n').slice(0, 50).map((line: string, i: number) => {
+                                    const isError = /error|exception|fail|cannot|not found|undefined|invalid/i.test(line);
+                                    return (
+                                        <div key={i} className={`text-[10px] font-mono leading-relaxed whitespace-pre-wrap break-words ${isError ? 'text-red-400 font-medium' : 'text-muted'}`}>
+                                            {line}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                         <div className="flex items-center gap-2 px-3 py-2 border-t border-[hsl(var(--surface-sunk))]">
@@ -1229,7 +1220,7 @@ export const ChatPanel = ({
                                 </button>
                             )}
                             {!buildResult.success && onAutoFix && (
-                                <button onClick={() => onAutoFix(buildResult.log)} className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-background bg-foreground rounded-lg hover:opacity-90 transition-all">
+                                <button onClick={() => onAutoFix(buildResult.log || '')} className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-background bg-foreground rounded-lg hover:opacity-90 transition-all">
                                     <Sparkles className="w-3 h-3" /> Auto-fix
                                 </button>
                             )}
@@ -1290,12 +1281,30 @@ export const ChatPanel = ({
             {reasoningPopupOpen && statusLog.length > 0 && (
                 <div className="absolute inset-0 z-30 flex items-center justify-center p-6" onClick={() => setReasoningPopupOpen(false)}>
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-                    <div className="relative w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-[#10151b] shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between border-b border-white/[.06] px-4 py-2.5">
+                    <div className="relative w-full max-w-md overflow-hidden rounded-xl bg-[#10151b] shadow-2xl" onClick={e => e.stopPropagation()}>
+                        {/* Animated multi-color border */}
+                        <div className="absolute inset-0 rounded-xl pointer-events-none">
+                            <div className="absolute inset-0 rounded-xl animate-[rainbow_3s_linear_infinite] opacity-75" style={{
+                                padding: '1px',
+                                background: 'linear-gradient(90deg, #ff0080, #ff8c00, #40e0d0, #7b68ee, #ff0080)',
+                                backgroundSize: '300% 100%',
+                                animation: 'rainbow 3s linear infinite',
+                                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                                WebkitMaskComposite: 'xor',
+                                maskComposite: 'exclude',
+                            }} />
+                        </div>
+                        <style>{`
+                            @keyframes rainbow {
+                                0% { background-position: 0% 50%; }
+                                100% { background-position: 300% 50%; }
+                            }
+                        `}</style>
+                        <div className="relative z-10 flex items-center justify-between border-b border-white/[.06] px-4 py-2.5">
                             <span className="flex items-center gap-2"><Brain className={`h-4 w-4 ${loading ? 'animate-pulse text-violet-300' : 'text-sky-300'}`} /><span className="text-[11px] font-semibold uppercase tracking-[.12em] text-zinc-200">AI reasoning</span><span className="text-[10px] text-zinc-500">{loading ? 'Working…' : 'Complete'}</span></span>
                             <button type="button" onClick={() => setReasoningPopupOpen(false)} className="rounded p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-200"><X className="h-4 w-4" /></button>
                         </div>
-                        <div className="max-h-[60vh] divide-y divide-white/[.055] overflow-y-auto">{statusLog.map((log, i) => <div key={`pop-${log.message}-${i}`} className="flex items-center gap-2 px-4 py-2 text-[11px]">{log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}<span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}>{log.message}</span></div>)}</div>
+                        <div className="relative z-10 max-h-[60vh] divide-y divide-white/[.055] overflow-y-auto">{statusLog.map((log, i) => <div key={`pop-${log.message}-${i}`} className="flex items-center gap-2 px-4 py-2 text-[11px]">{log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}<span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}>{log.message}</span></div>)}</div>
                     </div>
                 </div>
             )}
