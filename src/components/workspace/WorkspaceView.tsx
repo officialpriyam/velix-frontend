@@ -529,17 +529,84 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
         } catch { alert("Failed to rename"); }
     };
 
+    const extractErrorFromLog = (log: string): string => {
+        if (!log) return 'No error message available';
+        const lines = log.split('\n');
+        const errorLines: string[] = [];
+        let inErrorSection = false;
+        
+        for (const line of lines) {
+            const lower = line.toLowerCase();
+            // Start capturing at error indicators
+            if (lower.includes('error:') || lower.includes('error[') || 
+                lower.includes('compilation failure') || lower.includes('build failed') ||
+                lower.includes('cannot find symbol') || lower.includes('package .* does not exist') ||
+                lower.includes('incompatible types') || lower.includes('method does not override') ||
+                lower.includes('unreported exception') || lower.includes('illegal start') ||
+                lower.includes('missing return statement') || lower.includes('illegal reference')) {
+                inErrorSection = true;
+            }
+            // Capture error lines and surrounding context
+            if (inErrorSection || errorLines.length > 0) {
+                errorLines.push(line);
+                // Stop after 30 lines of error context
+                if (errorLines.length > 30) break;
+            }
+        }
+        
+        // If we didn't find specific errors, extract last 20 lines
+        if (errorLines.length === 0) {
+            return lines.slice(-20).join('\n');
+        }
+        return errorLines.join('\n');
+    };
+
     const handleAutoFix = (error: string) => {
         setBuildResult(null);
         setAutoFixPrompt(true);
+        const extractedError = extractErrorFromLog(error);
         const fileContext = Object.entries(files)
             .filter(([path, content]) => content && !path.endsWith('/'))
             .slice(0, 10)
             .map(([path, content]) => `=== FILE: ${path} ===\n${content}`)
             .join('\n\n');
         const prompt = fileContext
-            ? `You are a senior software engineer. A compilation error has occurred. Your task is to fix ONLY the specific file(s) causing the error.\n\nSTEPS:\n1. Read the error message carefully and identify the exact file and line causing the issue.\n2. Analyze the root cause — do NOT guess.\n3. Edit ONLY the affected file(s) with minimal, precise changes.\n4. Do NOT rewrite entire files. Do NOT add new features. Do NOT change unrelated code.\n5. Preserve all existing functionality — only fix what is broken.\n\nERROR:\n\`\`\`\n${error}\n\`\`\`\n\nEXISTING SOURCE FILES:\n\`\`\`\n${fileContext}\n\`\`\`\n\nOutput the fix as a single FILE: line with ONLY the changes needed. If you must rewrite a file, include the full file but keep changes minimal.`
-            : `You are a senior software engineer. A compilation error has occurred. Your task is to fix the specific file causing the error.\n\nSTEPS:\n1. Read the error message carefully and identify the exact file and line.\n2. Analyze the root cause.\n3. Edit ONLY the affected file with minimal, precise changes.\n4. Do NOT rewrite entire files. Do NOT add new features.\n\nERROR:\n\`\`\`\n${error}\n\`\`\`\n\nOutput the fix as a single FILE: line with ONLY the changes needed.`;
+            ? `You are a senior software engineer. A compilation error has occurred. Your task is to fix ONLY the specific file(s) causing the error.
+
+STEPS:
+1. Read the error message carefully and identify the exact file and line causing the issue.
+2. Analyze the root cause — do NOT guess.
+3. Edit ONLY the affected file(s) with minimal, precise changes.
+4. Do NOT rewrite entire files. Do NOT add new features. Do NOT change unrelated code.
+5. Preserve all existing functionality — only fix what is broken.
+6. Ensure all imports are correct and match what's in pom.xml/build.gradle.kts
+7. Ensure package declarations match the file path
+
+COMPILATION ERROR:
+\`\`\`
+${extractedError}
+\`\`\`
+
+EXISTING SOURCE FILES (read these to understand the current code):
+\`\`\`
+${fileContext}
+\`\`\`
+
+Output ONLY the fixed file(s) in FILE: path format with complete content.`
+            : `You are a senior software engineer. A compilation error has occurred. Your task is to fix the specific file causing the error.
+
+STEPS:
+1. Read the error message carefully and identify the exact file and line.
+2. Analyze the root cause.
+3. Edit ONLY the affected file with minimal, precise changes.
+4. Do NOT rewrite entire files. Do NOT add new features.
+
+COMPILATION ERROR:
+\`\`\`
+${extractedError}
+\`\`\`
+
+Output ONLY the fixed file in FILE: path format with complete content.`;
         setInitialPrompt(prompt);
     };
 
@@ -1342,19 +1409,21 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                                 })}
                             </div>
                             {/* Desktop: vertical nav */}
-                            <div className="hidden md:flex flex-1 overflow-y-auto space-y-4">
+                            <div className="hidden md:flex md:flex-col flex-1 overflow-y-auto space-y-4">
                                 {SETTINGS_NAV.map(group => (
-                                    <div key={group.group}>
+                                    <div key={group.group} className="flex flex-col">
                                         <div className="px-2 mb-1.5 text-[9px] font-bold uppercase tracking-widest text-faint">{group.group}</div>
-                                        {group.items.map(item => {
-                                            const Icon = item.icon;
-                                            return (
-                                                <button key={item.id} onClick={() => setSettingsTab(item.id)}
-                                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${settingsTab === item.id ? 'bg-[hsl(var(--surface-sunk))] text-foreground font-bold border-l-2 border-primary' : 'text-muted hover:text-foreground hover:bg-[hsl(var(--surface-sunk))]'}`}>
-                                                    <Icon className="w-4 h-4" /> {item.label}
-                                                </button>
-                                            );
-                                        })}
+                                        <div className="flex flex-col space-y-0.5">
+                                            {group.items.map(item => {
+                                                const Icon = item.icon;
+                                                return (
+                                                    <button key={item.id} onClick={() => setSettingsTab(item.id)}
+                                                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${settingsTab === item.id ? 'bg-[hsl(var(--surface-sunk))] text-foreground font-bold border-l-2 border-primary' : 'text-muted hover:text-foreground hover:bg-[hsl(var(--surface-sunk))]'}`}>
+                                                        <Icon className="w-4 h-4" /> {item.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
