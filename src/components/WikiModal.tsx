@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     ArrowLeft, BookOpen, Notebook, FilePlus, FilePlus2, FolderPlus,
     FolderOpen, Globe, ChevronRight, ChevronDown, Trash2, Save, Eye, EyeOff,
-    X, Loader2, Play, ExternalLink, Link2, Unlink, Check, AlertCircle, FileCode
+    X, Loader2, Play, ExternalLink, Link2, Unlink, Check, AlertCircle, FileCode, HelpCircle
 } from 'lucide-react';
 import { wikiApi, gitbookApi, type WikiPage } from '@/lib/api';
 import { useNotification } from './Notification';
@@ -98,24 +98,7 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
     const [gitbookError, setGitbookError] = useState('');
     const [gitbookPushing, setGitbookPushing] = useState(false);
     const [showGitbookPanel, setShowGitbookPanel] = useState(false);
-
-    const [gitlabToken, setGitlabToken] = useState('');
-    const [gitlabUrl, setGitlabUrl] = useState('https://gitlab.com');
-    const [gitlabPushing, setGitlabPushing] = useState(false);
-    const [showGitlabPanel, setShowGitlabPanel] = useState(false);
-    const [gitlabProjectName, setGitlabProjectName] = useState('');
-    const [gitlabConnected, setGitlabConnected] = useState(false);
-
-    // Load saved GitLab token from localStorage on mount
-    useEffect(() => {
-        const savedToken = localStorage.getItem('velix_gitlab_token');
-        const savedUrl = localStorage.getItem('velix_gitlab_url');
-        if (savedToken) {
-            setGitlabToken(savedToken);
-            setGitlabConnected(true);
-        }
-        if (savedUrl) setGitlabUrl(savedUrl);
-    }, []);
+    const [showHostingGuide, setShowHostingGuide] = useState(false);
 
     const commands: { type: WikiType; label: string }[] = [
         { type: 'getting-started', label: 'getting-started' },
@@ -164,11 +147,8 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
             setPrompt('');
             setActiveCommand(null);
             setShowGitbookPanel(false);
-            setShowGitlabPanel(false);
             setGitbookToken('');
             setGitbookError('');
-            setGitlabToken('');
-            setGitlabProjectName('');
         }
     }, [isOpen, loadPages, checkGitbookStatus]);
 
@@ -264,42 +244,6 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
         }
     };
 
-    const handleGitlabPush = async () => {
-        if (!gitlabToken.trim()) return;
-        setGitlabPushing(true);
-        try {
-            const result = await wikiApi.gitlabPush(sessionId, {
-                gitlab_token: gitlabToken.trim(),
-                gitlab_url: gitlabUrl.trim() || undefined,
-                project_name: gitlabProjectName.trim() || undefined,
-            });
-            // Save token to localStorage on success
-            localStorage.setItem('velix_gitlab_token', gitlabToken.trim());
-            localStorage.setItem('velix_gitlab_url', gitlabUrl.trim() || 'https://gitlab.com');
-            setGitlabConnected(true);
-            if (result.errors && result.errors.length > 0) {
-                showNotification(`Pushed ${result.pushed}/${result.total} files (${result.errors.length} failed): ${result.errors[0]}`, 'error');
-            } else {
-                showNotification(`Pushed ${result.pushed}/${result.total} files to GitLab!`, 'success');
-            }
-            if (result.projectUrl) {
-                window.open(result.projectUrl, '_blank');
-            }
-        } catch (err: any) {
-            showNotification(err.message || 'Failed to push to GitLab', 'error');
-        } finally {
-            setGitlabPushing(false);
-        }
-    };
-
-    const handleGitlabDisconnect = () => {
-        localStorage.removeItem('velix_gitlab_token');
-        localStorage.removeItem('velix_gitlab_url');
-        setGitlabToken('');
-        setGitlabConnected(false);
-        showNotification('GitLab disconnected', 'success');
-    };
-
     const handleGitbookConnect = async () => {
         if (!gitbookToken.trim()) return;
         setGitbookLoading(true);
@@ -379,6 +323,95 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
 
     if (!isOpen) return null;
 
+    const HostingGuideModal = () => (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowHostingGuide(false)}>
+            <div className="bg-background border border-white/10 rounded-2xl w-[560px] max-h-[80vh] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
+                    <div className="flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-semibold">Host Your Wiki with GitBook</span>
+                    </div>
+                    <button onClick={() => setShowHostingGuide(false)} className="p-1 rounded-lg hover:bg-white/10 transition-colors">
+                        <X className="w-4 h-4 text-muted" />
+                    </button>
+                </div>
+                <div className="p-5 overflow-y-auto max-h-[calc(80vh-60px)] space-y-4 text-[11px] leading-relaxed">
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                        <p className="text-foreground font-medium mb-2">What is GitBook?</p>
+                        <p className="text-muted">GitBook is a platform to host beautiful documentation sites. Your wiki pages will be published as a professional website with a shareable link.</p>
+                    </div>
+
+                    <div className="space-y-3">
+                        <p className="text-foreground font-semibold">Step-by-step guide:</p>
+
+                        <div className="flex gap-3">
+                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">1</div>
+                            <div>
+                                <p className="text-foreground font-medium">Create a GitBook Account</p>
+                                <p className="text-muted">Go to <a href="https://app.gitbook.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">app.gitbook.com</a> and sign up for free. The free tier supports one publication.</p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">2</div>
+                            <div>
+                                <p className="text-foreground font-medium">Create a New Space</p>
+                                <p className="text-muted">Inside GitBook, click <strong>New Space</strong> and choose <strong>Import from API</strong> or create an empty space. Name it after your project (e.g., "My Plugin Wiki").</p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">3</div>
+                            <div>
+                                <p className="text-foreground font-medium">Generate an Access Token</p>
+                                <p className="text-muted">Go to <a href="https://app.gitbook.com/account/developer" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">GitBook Developer Settings</a> and click <strong>Generate Token</strong>. Copy the token.</p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">4</div>
+                            <div>
+                                <p className="text-foreground font-medium">Connect in Velix</p>
+                                <p className="text-muted">Paste your token in the <strong>Push / Host</strong> section above and click <strong>Connect</strong>.</p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">5</div>
+                            <div>
+                                <p className="text-foreground font-medium">Push Your Wiki</p>
+                                <p className="text-muted">Click <strong>Push N pages</strong> to publish all your wiki documentation to GitBook. A link to your live site will open automatically.</p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">6</div>
+                            <div>
+                                <p className="text-foreground font-medium">Share Your Site</p>
+                                <p className="text-muted">Your wiki is now live! Share the URL from GitBook with anyone. Every time you push again, the site updates automatically.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-4 mt-4">
+                        <p className="text-foreground font-medium mb-1">Free tier includes:</p>
+                        <ul className="text-muted space-y-1 list-disc list-inside">
+                            <li>One publication (space) with unlimited pages</li>
+                            <li>Custom domain support</li>
+                            <li>SEO-friendly public URLs</li>
+                            <li>Version history</li>
+                        </ul>
+                    </div>
+
+                    <button onClick={() => setShowHostingGuide(false)}
+                        className="w-full mt-4 rounded-lg bg-primary px-3 py-2 text-[11px] font-medium text-background hover:opacity-90 transition-opacity">
+                        Got it, let's connect!
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <div className="fixed inset-0 z-[80] flex bg-background text-foreground">
             {/* Left Panel: Wiki Generator */}
@@ -411,22 +444,20 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
                         </div>
                         <div className="flex gap-1.5">
                             <button
-                                onClick={() => { setShowGitbookPanel(!showGitbookPanel); setShowGitlabPanel(false); }}
+                                onClick={() => setShowGitbookPanel(!showGitbookPanel)}
                                 className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-all border ${
                                     showGitbookPanel ? 'border-primary/40 bg-primary/10 text-primary' : 'border-white/10 bg-white/5 text-muted hover:text-foreground'
                                 }`}
                             >
                                 {gitbookConnected ? <Check className="w-3 h-3 text-success" /> : <Link2 className="w-3 h-3" />}
-                                GitBook
+                                Push / Host
                             </button>
                             <button
-                                onClick={() => { setShowGitlabPanel(!showGitlabPanel); setShowGitbookPanel(false); }}
-                                className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-all border ${
-                                    showGitlabPanel ? 'border-orange-400/40 bg-orange-400/10 text-orange-400' : 'border-white/10 bg-white/5 text-muted hover:text-foreground'
-                                }`}
+                                onClick={() => setShowHostingGuide(true)}
+                                className="flex items-center justify-center rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[10px] text-muted hover:text-foreground transition-all"
+                                title="How to host your wiki"
                             >
-                                <ExternalLink className="w-3 h-3" />
-                                GitLab
+                                <HelpCircle className="w-3 h-3" />
                             </button>
                         </div>
 
@@ -470,49 +501,6 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
                                             className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-primary px-2 py-1.5 text-[11px] font-medium text-background hover:opacity-90 disabled:opacity-50">
                                             {gitbookLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
                                             {gitbookLoading ? 'Validating...' : 'Connect'}
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        )}
-
-                        {showGitlabPanel && (
-                            <div className="mt-3 space-y-2">
-                                {gitlabConnected ? (
-                                    <>
-                                        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20">
-                                            <Check className="w-3 h-3 text-green-400" />
-                                            <span className="text-[10px] text-green-400 font-medium">GitLab Connected</span>
-                                        </div>
-                                        <input type="text" value={gitlabProjectName} onChange={e => setGitlabProjectName(e.target.value)}
-                                            placeholder="Project name (optional)" className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
-                                        <div className="flex gap-2">
-                                            <button onClick={handleGitlabPush} disabled={gitlabPushing}
-                                                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-orange-500 px-2 py-1.5 text-[11px] font-medium text-white hover:bg-orange-600 disabled:opacity-50 transition-all">
-                                                {gitlabPushing ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
-                                                {gitlabPushing ? 'Pushing...' : `Push ${pages.length} pages`}
-                                            </button>
-                                            <button onClick={handleGitlabDisconnect}
-                                                className="px-2 py-1.5 text-[10px] text-muted hover:text-red-400 rounded-lg border border-white/10 hover:border-red-500/20 transition-all">
-                                                Disconnect
-                                            </button>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="text-[10px] text-muted leading-relaxed">
-                                            Enter a GitLab Personal Access Token with <code className="text-primary">api</code> scope.
-                                        </div>
-                                        <input type="text" value={gitlabUrl} onChange={e => setGitlabUrl(e.target.value)}
-                                            placeholder="https://gitlab.com" className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
-                                        <input type="text" value={gitlabProjectName} onChange={e => setGitlabProjectName(e.target.value)}
-                                            placeholder="Project name (optional)" className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
-                                        <input type="password" value={gitlabToken} onChange={e => setGitlabToken(e.target.value)}
-                                            placeholder="Paste GitLab access token..." className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-foreground outline-none focus:border-orange-400/40 placeholder:text-faint" />
-                                        <button onClick={handleGitlabPush} disabled={gitlabPushing || !gitlabToken.trim()}
-                                            className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-orange-500 px-2 py-1.5 text-[11px] font-medium text-white hover:bg-orange-600 disabled:opacity-50 transition-all">
-                                            {gitlabPushing ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
-                                            {gitlabPushing ? 'Pushing...' : `Push ${pages.length} pages to GitLab`}
                                         </button>
                                     </>
                                 )}
@@ -679,6 +667,7 @@ export function WikiModal({ isOpen, onClose, sessionId }: WikiModalProps) {
                     </div>
                 )}
             </div>
+            {showHostingGuide && <HostingGuideModal />}
         </div>
     );
 }
