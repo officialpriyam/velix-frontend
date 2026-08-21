@@ -154,6 +154,7 @@ export const ChatPanel = ({
     const [docsChecked, setDocsChecked] = useState(false);
     const [commandStatus, setCommandStatus] = useState<{ command: string; status: string; output?: string }[]>([]);
     const [downloadStatus, setDownloadStatus] = useState<{ url: string; path: string; success: boolean }[]>([]);
+    const [agentCount, setAgentCount] = useState<number>(0);
     const abortControllerRef = useRef<AbortController | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -568,6 +569,7 @@ export const ChatPanel = ({
         setDocsStatus([]);
         setCommandStatus([]);
         setDownloadStatus([]);
+        setAgentCount(0);
 
         // Local accumulators — populated live by onProgress and baked into the
         // summary message metadata (React state would be stale in this closure).
@@ -733,6 +735,13 @@ export const ChatPanel = ({
                     setStatusLog([...logs]);
                 } else if (ev.event === 'model') {
                     const modelLabel = ev.model || 'AI';
+                    // Parse agent count from model label (e.g., "3 agents" or "single agent")
+                    const agentMatch = modelLabel.match(/(\d+)\s*agent/i);
+                    if (agentMatch) {
+                        setAgentCount(parseInt(agentMatch[1]));
+                    } else if (modelLabel.toLowerCase().includes('single')) {
+                        setAgentCount(1);
+                    }
                     logs.push({ message: `Generating with ${modelLabel}...`, type: 'pending' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'file') {
@@ -1104,6 +1113,11 @@ export const ChatPanel = ({
                         <div className="flex items-center gap-2">
                             <Brain className="h-3.5 w-3.5 animate-pulse text-violet-300" />
                             <span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">AI reasoning</span>
+                            {agentCount > 0 && (
+                                <span className="px-1.5 py-0.5 text-[8px] font-bold bg-violet-500/20 text-violet-300 rounded-full border border-violet-500/30">
+                                    {agentCount} agent{agentCount !== 1 ? 's' : ''}
+                                </span>
+                            )}
                             <span className="text-[9px] text-zinc-500">Working…</span>
                             <Loader2 className="h-3 w-3 animate-spin text-sky-400 ml-auto" />
                         </div>
@@ -1364,7 +1378,16 @@ export const ChatPanel = ({
                             }
                         `}</style>
                         <div className="relative z-10 flex items-center justify-between border-b border-white/[.06] px-4 py-2.5">
-                            <span className="flex items-center gap-2"><Brain className={`h-4 w-4 ${loading ? 'animate-pulse text-violet-300' : 'text-sky-300'}`} /><span className="text-[11px] font-semibold uppercase tracking-[.12em] text-zinc-200">AI reasoning</span><span className="text-[10px] text-zinc-500">{loading ? 'Working…' : 'Complete'}</span></span>
+                            <span className="flex items-center gap-2">
+                                <Brain className={`h-4 w-4 ${loading ? 'animate-pulse text-violet-300' : 'text-sky-300'}`} />
+                                <span className="text-[11px] font-semibold uppercase tracking-[.12em] text-zinc-200">AI reasoning</span>
+                                {agentCount > 0 && (
+                                    <span className="px-1.5 py-0.5 text-[8px] font-bold bg-violet-500/20 text-violet-300 rounded-full border border-violet-500/30">
+                                        {agentCount} agent{agentCount !== 1 ? 's' : ''}
+                                    </span>
+                                )}
+                                <span className="text-[10px] text-zinc-500">{loading ? 'Working…' : 'Complete'}</span>
+                            </span>
                             <button type="button" onClick={() => setReasoningPopupOpen(false)} className="rounded p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-200"><X className="h-4 w-4" /></button>
                         </div>
                         <div className="relative z-10 max-h-[60vh] divide-y divide-white/[.055] overflow-y-auto">{statusLog.map((log, i) => <div key={`pop-${log.message}-${i}`} className="flex items-center gap-2 px-4 py-2 text-[11px]">{log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}<span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}>{log.message}</span></div>)}</div>
