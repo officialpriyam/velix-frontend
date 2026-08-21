@@ -1,9 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { ChatMessage, FilesChangedBox, SearchBox, DocsBox, CommandsBox, DownloadsBox } from './ChatMessage';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ChatMessage } from './ChatMessage';
 import { ModelSelector } from './ModelSelector';
-import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square, Globe, Brain, Eye, ChevronDown, TerminalSquare } from 'lucide-react';
+import {
+    Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X,
+    FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square,
+    Globe, Brain, Eye, ChevronDown, TerminalSquare, Circle, CheckCircle2, Clock,
+    ChevronRight, ListChecks, Code2, BookOpen, Wrench, PanelRightClose
+} from 'lucide-react';
 import { aiApi, copyToClipboard } from '../lib/api';
 import { useNotification } from './Notification';
 import { showConfirm } from './ConfirmDialog';
@@ -35,7 +40,6 @@ export interface BuildResult {
 interface ChatPanelProps {
     sessionId?: string | null;
     onCodeGenerated: (sessionId: string, aiResponse: any) => void;
-    onFileStream?: (file: { path: string; content: string }) => void;
     model?: string;
     language?: string;
     platform?: string;
@@ -43,7 +47,6 @@ interface ChatPanelProps {
     onPromptSubmit?: (prompt: string) => void;
     initialPrompt?: string | null;
     onInitialPromptHandled?: () => void;
-    initialPromptForceBuild?: boolean;
     highlight?: string;
     modelDropdown?: React.ReactNode;
     typeDropdown?: React.ReactNode;
@@ -56,7 +59,9 @@ interface ChatPanelProps {
     projectFiles?: Record<string, string>;
     onPlanCreated?: (content: string) => void;
     onOpenPlanFile?: () => void;
+    onFileStream?: (file: { path: string; content: string }) => void;
     onOpenFile?: (path: string) => void;
+    initialPromptForceBuild?: boolean;
 }
 
 function getFileIcon(filename: string) {
@@ -85,7 +90,7 @@ function getFileType(filename: string): string {
 function formatPlanMarkdown(plan: any, questions: any[] = []) {
     const lines = [`# ${plan?.title || 'Project Plan'}`, '', plan?.summary || ''];
     if (plan?.components?.length) {
-        lines.push('', '## What I’ll build', '');
+        lines.push('', "## What I'll build", '');
         plan.components.forEach((component: any) => lines.push(`- **${component.name}** — ${component.desc}`));
     }
     if (plan?.designDirection?.length) lines.push('', '## Design direction', '', ...plan.designDirection.map((item: string) => `- ${item}`));
@@ -101,10 +106,166 @@ function parseMetadata(metadata: any) {
     return metadata;
 }
 
+function formatElapsed(seconds: number): string {
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+}
+
+/* ─── Collapsible Section ────────────────────────────────────────────── */
+function CollapsibleSection({
+    title,
+    icon,
+    count,
+    defaultOpen = true,
+    children,
+    className = '',
+    headerRight,
+}: {
+    title: string;
+    icon: React.ReactNode;
+    count?: number;
+    defaultOpen?: boolean;
+    children: React.ReactNode;
+    className?: string;
+    headerRight?: React.ReactNode;
+}) {
+    const [open, setOpen] = useState(defaultOpen);
+    return (
+        <div className={`border border-white/[.08] rounded-lg overflow-hidden bg-[#10151b]/80 ${className}`}>
+            <button
+                type="button"
+                onClick={() => setOpen(!open)}
+                className="flex items-center w-full px-3 py-2 text-left hover:bg-white/[.03] transition-colors"
+            >
+                {icon}
+                <span className="ml-2 text-[11px] font-semibold text-zinc-300">{title}</span>
+                {count !== undefined && (
+                    <span className="ml-1.5 text-[10px] text-zinc-500">{count}</span>
+                )}
+                {headerRight}
+                <ChevronDown className={`ml-auto w-3.5 h-3.5 text-zinc-500 transition-transform duration-150 ${open ? '' : '-rotate-90'}`} />
+            </button>
+            {open && <div className="px-3 pb-2">{children}</div>}
+        </div>
+    );
+}
+
+/* ─── File Badge (EDITED / CREATED) ──────────────────────────────────── */
+function FileBadge({ path, edited }: { path: string; edited?: boolean }) {
+    return (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-white/[.06] bg-white/[.02]">
+            {getFileIcon(path)}
+            <span className="text-[11px] text-zinc-400 font-mono truncate">{path}</span>
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400 font-medium shrink-0">
+                {edited ? 'EDITED' : 'CREATED'}
+                <Check className="w-3 h-3" />
+            </span>
+        </div>
+    );
+}
+
+/* ─── Running Tool Indicator ─────────────────────────────────────────── */
+function RunningToolIndicator({ label, elapsed }: { label: string; elapsed: number }) {
+    return (
+        <div className="flex items-center gap-3 px-3 py-2">
+            <Loader2 className="w-4 h-4 animate-spin text-emerald-400 shrink-0" />
+            <span className="text-[11px] font-semibold text-zinc-200">{label}</span>
+            <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 rounded-full animate-[indeterminate_2s_ease-in-out_infinite]" style={{ width: '60%' }} />
+            </div>
+            <span className="text-[10px] text-zinc-500 tabular-nums shrink-0">{formatElapsed(elapsed)}</span>
+        </div>
+    );
+}
+
+/* ─── Streaming Output Indicator ─────────────────────────────────────── */
+function StreamingIndicator({ elapsed }: { elapsed: number }) {
+    return (
+        <div className="flex items-center gap-3 px-3 py-2">
+            <Loader2 className="w-4 h-4 animate-spin text-emerald-400 shrink-0" />
+            <span className="text-[11px] text-zinc-300">
+                <span className="font-semibold">Writing response</span>
+                <span className="text-zinc-500 mx-1.5">·</span>
+                <span className="text-zinc-500">streaming output</span>
+            </span>
+            <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 rounded-full animate-[indeterminate_2s_ease-in-out_infinite]" style={{ width: '60%' }} />
+            </div>
+            <span className="text-[10px] text-zinc-500 tabular-nums shrink-0">{formatElapsed(elapsed)}</span>
+        </div>
+    );
+}
+
+/* ─── To-Dos Checklist ───────────────────────────────────────────────── */
+function TodosChecklist({ todos, completedCount }: { todos: string[]; completedCount: number }) {
+    const [expanded, setExpanded] = useState(true);
+    if (!todos.length) return null;
+    return (
+        <div className="border border-white/[.08] rounded-lg overflow-hidden bg-[#10151b]/80">
+            <button
+                type="button"
+                onClick={() => setExpanded(!expanded)}
+                className="flex items-center w-full px-3 py-2 text-left hover:bg-white/[.03] transition-colors"
+            >
+                <ListChecks className="w-3.5 h-3.5 text-zinc-400" />
+                <span className="ml-2 text-[11px] font-semibold text-zinc-300">To-dos</span>
+                <span className="ml-1.5 text-[10px] text-zinc-500">{completedCount}/{todos.length}</span>
+                <ChevronDown className={`ml-auto w-3.5 h-3.5 text-zinc-500 transition-transform duration-150 ${expanded ? '' : '-rotate-90'}`} />
+            </button>
+            {expanded && (
+                <div className="px-3 pb-2 space-y-1">
+                    {todos.map((todo, i) => {
+                        const done = i < completedCount;
+                        return (
+                            <div key={i} className="flex items-start gap-2 py-1">
+                                {done ? (
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                                ) : (
+                                    <Circle className="w-4 h-4 text-zinc-600 shrink-0 mt-0.5" />
+                                )}
+                                <span className={`text-[11px] leading-relaxed ${done ? 'text-zinc-500 line-through' : 'text-zinc-300'}`}>
+                                    {todo}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ─── Steps Counter ──────────────────────────────────────────────────── */
+function StepsCounter({ count }: { count: number }) {
+    const [expanded, setExpanded] = useState(false);
+    if (count === 0) return null;
+    return (
+        <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+        >
+            <span>Worked {count} step{count !== 1 ? 's' : ''}</span>
+            <ChevronRight className={`w-3 h-3 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`} />
+        </button>
+    );
+}
+
+/* ─── Message Queued Bar ─────────────────────────────────────────────── */
+function MessageQueuedBar() {
+    return (
+        <div className="flex items-center gap-2 px-3 py-2 border border-white/[.06] rounded-lg bg-[#10151b]/60">
+            <Clock className="w-3.5 h-3.5 text-zinc-500" />
+            <span className="text-[11px] text-zinc-500">Message queued</span>
+        </div>
+    );
+}
+
 export const ChatPanel = ({
     sessionId,
     onCodeGenerated,
-    onFileStream,
     compact = false,
     onPromptSubmit,
     projectFiles,
@@ -122,10 +283,11 @@ export const ChatPanel = ({
     onDownloadArtifact,
     initialPrompt,
     onInitialPromptHandled,
-    initialPromptForceBuild,
     onPlanCreated,
     onOpenPlanFile,
-    onOpenFile
+    onFileStream,
+    onOpenFile,
+    initialPromptForceBuild
 }: ChatPanelProps) => {
     const { showNotification } = useNotification();
     const router = useRouter();
@@ -137,12 +299,10 @@ export const ChatPanel = ({
     const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: string; content: string; size: number }[]>([]);
     const [enableWebSearch, setEnableWebSearch] = useState(false);
     const [chatMode, setChatMode] = useState(false);
-  // Plan mode state
-  const [planPrompt, setPlanPrompt] = useState('');
+    const [planPrompt, setPlanPrompt] = useState('');
     const [execMode, setExecMode] = useState<'build' | 'plan' | 'chat'>('plan');
     const [showExecModeDropdown, setShowExecModeDropdown] = useState(false);
 
-    // Interactive Plan & Questions State
     const [planningData, setPlanningData] = useState<{ questions: any[]; plan: any } | null>(null);
     const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
     const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
@@ -150,64 +310,37 @@ export const ChatPanel = ({
     const [planApproved, setPlanApproved] = useState(false);
 
     const [searchStatus, setSearchStatus] = useState<{ queries: string[]; sources: { title: string; url: string }[] } | null>(null);
-    const [docsStatus, setDocsStatus] = useState<string[]>([]);
-    const [docsChecked, setDocsChecked] = useState(false);
-    const [commandStatus, setCommandStatus] = useState<{ command: string; status: string; output?: string }[]>([]);
-    const [downloadStatus, setDownloadStatus] = useState<{ url: string; path: string; success: boolean }[]>([]);
-    const [agentCount, setAgentCount] = useState<number>(0);
     const abortControllerRef = useRef<AbortController | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
-    const [scrolledDown, setScrolledDown] = useState(false);
-    const [reasoningPopupOpen, setReasoningPopupOpen] = useState(false);
     const autoSubmittedPromptRef = useRef<string | null>(null);
     const { user } = useAuth();
 
-    useEffect(() => {
-        const el = scrollRef.current;
-        if (!el) return;
-        const onScroll = () => {
-            const scrolledFromTop = el.scrollTop > 60;
-            setScrolledDown(scrolledFromTop);
-        };
-        onScroll();
-        el.addEventListener('scroll', onScroll, { passive: true });
-        return () => el.removeEventListener('scroll', onScroll);
-    }, []);
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    const [agentCount, setAgentCount] = useState(0);
+    const [runningTool, setRunningTool] = useState<string | null>(null);
+    const [todos, setTodos] = useState<string[]>([]);
+    const [completedTodos, setCompletedTodos] = useState(0);
+    const [stepCount, setStepCount] = useState(0);
+    const [activeSection, setActiveSection] = useState<'reasoning' | 'todos' | 'files' | 'read'>('reasoning');
 
     const statusLogKey = sessionId ? `velix_status_log_${sessionId}` : '';
     const generatedFilesKey = sessionId ? `velix_generated_files_${sessionId}` : '';
     const messagesKey = sessionId ? `velix_messages_${sessionId}` : '';
 
-    // Detect generation mode from language (component-level for JSX access)
     const isConfig = language?.startsWith('config-');
     const isDatapack = language?.startsWith('datapack-');
     const isScripting = language?.startsWith('scripting-');
 
-    // File upload constants
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
     const MAX_FILES = 5;
-    const ACCEPTED_TYPES = {
-        'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'],
-        'text/*': ['.txt', '.md', '.log', '.csv', '.mcfunction'],
-        'application/javascript': ['.js', '.jsx', '.mjs'],
-        'application/typescript': ['.ts', '.tsx'],
-        'text/x-java': ['.java'],
-        'text/x-kotlin': ['.kt', '.kts'],
-        'text/x-python': ['.py'],
-        'text/x-yaml': ['.yml', '.yaml'],
-        'application/json': ['.json'],
-        'text/xml': ['.xml'],
-        'text/plain': ['.gradle', '.kts', '.properties', '.toml', '.sh', '.cfg', '.conf', '.ini'],
-    };
 
     const readFileAsBase64 = (file: File): Promise<string> => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => {
                 const result = reader.result as string;
-                // Strip the data URL prefix (e.g., "data:image/png;base64,")
                 const base64 = result.split(',')[1] || result;
                 resolve(base64);
             };
@@ -228,10 +361,8 @@ export const ChatPanel = ({
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
-
         const newFiles = Array.from(files).slice(0, MAX_FILES - attachedFiles.length);
         const processed: { name: string; type: string; content: string; size: number }[] = [];
-
         for (const file of newFiles) {
             if (file.size > MAX_FILE_SIZE) {
                 showNotification(`File "${file.name}" exceeds 10MB limit`, 'error');
@@ -240,17 +371,11 @@ export const ChatPanel = ({
             try {
                 const isImage = file.type.startsWith('image/');
                 const content = isImage ? await readFileAsBase64(file) : await readFileAsText(file);
-                processed.push({
-                    name: file.name,
-                    type: file.type,
-                    content,
-                    size: file.size
-                });
+                processed.push({ name: file.name, type: file.type, content, size: file.size });
             } catch {
                 showNotification(`Failed to read "${file.name}"`, 'error');
             }
         }
-
         setAttachedFiles(prev => [...prev, ...processed].slice(0, MAX_FILES));
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
@@ -259,20 +384,15 @@ export const ChatPanel = ({
         setAttachedFiles(prev => prev.filter((_, i) => i !== index));
     };
 
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-    };
+    const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); };
 
     const handleDrop = async (e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
         const files = e.dataTransfer.files;
         if (!files || files.length === 0) return;
-
         const newFiles = Array.from(files).slice(0, MAX_FILES - attachedFiles.length);
         const processed: { name: string; type: string; content: string; size: number }[] = [];
-
         for (const file of newFiles) {
             if (file.size > MAX_FILE_SIZE) {
                 showNotification(`File "${file.name}" exceeds 10MB limit`, 'error');
@@ -281,17 +401,11 @@ export const ChatPanel = ({
             try {
                 const isImage = file.type.startsWith('image/');
                 const content = isImage ? await readFileAsBase64(file) : await readFileAsText(file);
-                processed.push({
-                    name: file.name,
-                    type: file.type,
-                    content,
-                    size: file.size
-                });
+                processed.push({ name: file.name, type: file.type, content, size: file.size });
             } catch {
                 showNotification(`Failed to read "${file.name}"`, 'error');
             }
         }
-
         setAttachedFiles(prev => [...prev, ...processed].slice(0, MAX_FILES));
     };
 
@@ -310,11 +424,19 @@ export const ChatPanel = ({
         setStatusLog([{ message: 'Generation stopped by user', type: 'error' }]);
     };
 
+    // Timer for elapsed seconds
+    useEffect(() => {
+        let interval: ReturnType<typeof setInterval> | null = null;
+        if (loading) {
+            setElapsedSeconds(0);
+            interval = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
+        }
+        return () => { if (interval) clearInterval(interval); };
+    }, [loading]);
+
     useEffect(() => {
         if (messagesKey && messages.length > 0) {
-            try {
-                localStorage.setItem(messagesKey, JSON.stringify(messages));
-            } catch {}
+            try { localStorage.setItem(messagesKey, JSON.stringify(messages)); } catch {}
         }
     }, [messages, messagesKey]);
 
@@ -324,9 +446,7 @@ export const ChatPanel = ({
                 const saved = localStorage.getItem(messagesKey);
                 if (saved) {
                     const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        setMessages(parsed);
-                    }
+                    if (Array.isArray(parsed) && parsed.length > 0) setMessages(parsed);
                 }
             } catch {}
         }
@@ -334,9 +454,7 @@ export const ChatPanel = ({
 
     useEffect(() => {
         if (statusLogKey && statusLog.length > 0) {
-            try {
-                localStorage.setItem(statusLogKey, JSON.stringify(statusLog));
-            } catch {}
+            try { localStorage.setItem(statusLogKey, JSON.stringify(statusLog)); } catch {}
         }
     }, [statusLog, statusLogKey]);
 
@@ -346,9 +464,7 @@ export const ChatPanel = ({
                 const saved = localStorage.getItem(statusLogKey);
                 if (saved) {
                     const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        setStatusLog(parsed);
-                    }
+                    if (Array.isArray(parsed) && parsed.length > 0) setStatusLog(parsed);
                 }
             } catch {}
         }
@@ -356,9 +472,7 @@ export const ChatPanel = ({
 
     useEffect(() => {
         if (generatedFilesKey && (generatedFiles.created.length > 0 || generatedFiles.edited.length > 0)) {
-            try {
-                localStorage.setItem(generatedFilesKey, JSON.stringify(generatedFiles));
-            } catch {}
+            try { localStorage.setItem(generatedFilesKey, JSON.stringify(generatedFiles)); } catch {}
         }
     }, [generatedFiles, generatedFilesKey]);
 
@@ -368,9 +482,7 @@ export const ChatPanel = ({
                 const saved = localStorage.getItem(generatedFilesKey);
                 if (saved) {
                     const parsed = JSON.parse(saved);
-                    if (parsed && (parsed.created?.length > 0 || parsed.edited?.length > 0)) {
-                        setGeneratedFiles(parsed);
-                    }
+                    if (parsed && (parsed.created?.length > 0 || parsed.edited?.length > 0)) setGeneratedFiles(parsed);
                 }
             } catch {}
         }
@@ -386,7 +498,7 @@ export const ChatPanel = ({
             autoSubmittedPromptRef.current = initialPrompt;
             setPrompt(initialPrompt);
             setTimeout(() => {
-                handleSend(initialPrompt, initialPromptForceBuild);
+                handleSend(initialPrompt);
                 if (onInitialPromptHandled) onInitialPromptHandled();
             }, 100);
         }
@@ -414,9 +526,7 @@ export const ChatPanel = ({
         }
     }, [sessionId]);
 
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages, statusLog, buildResult]);
+    useEffect(() => { scrollToBottom(); }, [messages, statusLog, buildResult]);
 
     const handleEnhance = async () => {
         if (!prompt.trim() || loading) return;
@@ -437,11 +547,10 @@ export const ChatPanel = ({
         }
     };
 
-    const handleSend = async (messageOverride?: string, forceBuild?: boolean) => {
+    const handleSend = async (messageOverride?: string) => {
         const userMsg = messageOverride || prompt.trim();
         if ((!userMsg && attachedFiles.length === 0) || loading) return;
 
-        // Check credits before generating
         const credits = user?.credits ?? 0;
         if (credits < 20) {
             setStatusLog([{ message: `Out of credits. You have ${credits} credits. 20 credits required to generate.`, type: 'error' }]);
@@ -460,7 +569,6 @@ export const ChatPanel = ({
             finalPrompt = `[PRIORITY CONTEXT: User highlighted the following code in the editor. Focus on this or use it for reference:]\n\`\`\`\n${highlight}\n\`\`\`\n\n${userMsg}`;
         }
 
-        // Attach uploaded file contents to prompt
         if (attachedFiles.length > 0) {
             const fileSections: string[] = [];
             for (const f of attachedFiles) {
@@ -479,12 +587,11 @@ export const ChatPanel = ({
         setLoading(true);
         setGeneratedFiles({ created: [], edited: [] });
         setSearchStatus(null);
-        setDocsStatus([]);
-        setDocsChecked(false);
-        setCommandStatus([]);
-        setDownloadStatus([]);
+        setTodos([]);
+        setCompletedTodos(0);
+        setStepCount(0);
+        setRunningTool(null);
 
-        // Create abort controller for this request
         const controller = new AbortController();
         abortControllerRef.current = controller;
 
@@ -495,7 +602,7 @@ export const ChatPanel = ({
             return [...prev, { role: 'user', content: userMsg, attachments: attachments.length > 0 ? attachments : undefined }];
         });
 
-        if (execMode === 'plan' && !forceBuild) {
+        if (execMode === 'plan') {
             setStatusLog([{ message: 'Analyzing request parameters & goals...', type: 'pending' }]);
             try {
                 if (!sessionId) throw new Error('Create or open a project before planning.');
@@ -517,10 +624,7 @@ export const ChatPanel = ({
                     plan: normalizedPlan,
                     questions: normalizedQuestions,
                     answers: messageMetadata.answers || {},
-                    status: messageMetadata.status || 'awaiting_answers',
-                    search: planRes?.searchQueries?.length
-                        ? { queries: planRes.searchQueries, sources: planRes.searchSources || [] }
-                        : undefined
+                    status: messageMetadata.status || 'awaiting_answers'
                 };
                 if (planRes) {
                     setPlanningData({ plan: normalizedPlan, questions: normalizedQuestions });
@@ -550,11 +654,11 @@ export const ChatPanel = ({
             return;
         }
 
-        runBuildGeneration(finalPrompt, undefined, forceBuild);
+        runBuildGeneration(finalPrompt);
     };
 
-    const runBuildGeneration = async (finalPromptOverride?: string, approvedPlanId?: number, forceBuild?: boolean) => {
-        const effectiveChatMode = forceBuild ? false : (execMode === 'chat' || chatMode);
+    const runBuildGeneration = async (finalPromptOverride?: string, approvedPlanId?: number) => {
+        const effectiveChatMode = execMode === 'chat' || chatMode;
         const userMsg = messages[messages.length - 1]?.content || prompt;
         let finalPrompt = finalPromptOverride || userMsg;
 
@@ -566,17 +670,10 @@ export const ChatPanel = ({
         setLoading(true);
         setGeneratedFiles({ created: [], edited: [] });
         setSearchStatus(null);
-        setDocsStatus([]);
-        setCommandStatus([]);
-        setDownloadStatus([]);
-        setAgentCount(0);
-
-        // Local accumulators — populated live by onProgress and baked into the
-        // summary message metadata (React state would be stale in this closure).
-        const localSearch: { queries: string[]; sources: { title: string; url: string }[] } = { queries: [], sources: [] };
-        const localDocs: string[] = [];
-        const localCommands: { command: string; status: string; output?: string }[] = [];
-        const localDownloads: { url: string; path: string; success: boolean }[] = [];
+        setStepCount(0);
+        setRunningTool(null);
+        setTodos([]);
+        setCompletedTodos(0);
 
         if (typeof window !== 'undefined' && window.location.search) {
             const cleanUrl = window.location.pathname;
@@ -584,7 +681,7 @@ export const ChatPanel = ({
         }
 
         const skillLabel = platform === 'minecraft' ? 'Minecraft' : platform === 'discord' ? 'Discord' : platform === 'hytale' ? 'Hytale' : platform;
-        
+
         let platformLabel = 'Minecraft Plugin';
         let modeLabel = 'Plugin';
         if (isConfig) {
@@ -605,19 +702,17 @@ export const ChatPanel = ({
             modeLabel = 'Plugin';
         }
 
-        setStatusLog([
-            { message: 'Analyzing request...', type: 'pending' }
-        ]);
+        setStatusLog([{ message: 'Analyzing request...', type: 'pending' }]);
         await new Promise(r => setTimeout(r, 500));
 
         const logs: { message: string; type: 'pending' | 'done' | 'error' }[] = [
             { message: 'Analyzing request...', type: 'done' }
         ];
-
-        let streamedFiles = false;
+        setStepCount(1);
 
         if (!effectiveChatMode) {
             setStatusLog([...logs, { message: `Loading ${skillLabel} ${modeLabel.toLowerCase()} skills...`, type: 'pending' }]);
+            setRunningTool('Loading skills');
             await new Promise(r => setTimeout(r, 400));
 
             const skillDetails: Record<string, string[]> = {
@@ -634,6 +729,9 @@ export const ChatPanel = ({
             const skills = skillDetails[platform] || [];
 
             logs.push({ message: `Loading ${skillLabel} ${modeLabel.toLowerCase()} skills...`, type: 'done' });
+            setStepCount(2);
+            setRunningTool(null);
+
             for (const skill of skills.slice(0, 3)) {
                 logs.push({ message: `  ${skill}`, type: 'pending' });
                 setStatusLog([...logs]);
@@ -643,11 +741,10 @@ export const ChatPanel = ({
                 setStatusLog([...logs]);
             }
             if (skills.length > 3) {
-            logs.push({ message: `  +${skills.length - 3} more skills`, type: 'done' });
-            setStatusLog([...logs]);
-        }
+                logs.push({ message: `  +${skills.length - 3} more skills`, type: 'done' });
+                setStatusLog([...logs]);
+            }
         } else {
-            // Chat mode: minimal status
             setStatusLog([...logs, { message: 'Chat mode — just talking, no code gen', type: 'done' }]);
         }
 
@@ -670,6 +767,7 @@ export const ChatPanel = ({
         }
 
         logs.push({ message: `Optimizing prompt...`, type: 'pending' });
+        setRunningTool('Optimizing prompt');
         setStatusLog([...logs]);
 
         let optimizedPrompt = finalPrompt;
@@ -685,20 +783,32 @@ export const ChatPanel = ({
             if (enhanceErr.name === 'AbortError') { setLoading(false); return; }
             logs[logs.length - 1] = { message: `Using original prompt`, type: 'done' };
         }
+        setRunningTool(null);
         setStatusLog([...logs]);
 
         const genLabel = effectiveChatMode ? 'Thinking...' : isConfig ? 'Generating config...' : isDatapack ? 'Generating datapack...' : isScripting ? 'Generating commands...' : 'Generating code...';
         logs.push({ message: genLabel, type: 'pending' });
+        setRunningTool(genLabel.replace('...', ''));
         setStatusLog([...logs]);
+
+        // Set up todos based on mode
+        if (!effectiveChatMode) {
+            const newTodos = [
+                `Analyze request for ${platformLabel}`,
+                `Load ${skillLabel} skills`,
+                `Generate ${modeLabel.toLowerCase()} code`,
+                `Verify and optimize`
+            ];
+            setTodos(newTodos);
+            setCompletedTodos(0);
+        }
 
         let result: any;
         try {
-            // Extract images from attached files for vision
             const imageAttachments = attachedFiles
                 .filter(f => f.type.startsWith('image/'))
                 .map(f => ({ data: f.content, mimeType: f.type }));
 
-            // Build file context from project files (paths + truncated content)
             const fileContextEntries = projectFiles
                 ? Object.entries(projectFiles)
                     .filter(([path]) => !path.startsWith('.') && !path.includes('node_modules'))
@@ -709,79 +819,6 @@ export const ChatPanel = ({
                     }))
                 : [];
 
-            // Live progress updates streamed from the backend via SSE
-            let searchQuery = '';
-            const onProgress = (ev: any) => {
-                if (ev.event === 'searching') {
-                    searchQuery = ev.query || searchQuery;
-                    logs.push({ message: 'Searching the web...', type: 'pending' });
-                    setStatusLog([...logs]);
-                } else if (ev.event === 'search') {
-                    if (ev.title && ev.url) {
-                        if (!localSearch.queries.includes(searchQuery)) localSearch.queries.push(searchQuery || 'the web');
-                        localSearch.sources.push({ title: ev.title, url: ev.url });
-                        setSearchStatus({ queries: [...localSearch.queries], sources: [...localSearch.sources] });
-                    }
-                    logs.push({ message: `Found source: ${ev.title || 'web result'}`, type: 'done' });
-                    setStatusLog([...logs]);
-                } else if (ev.event === 'docs') {
-                    setDocsChecked(true);
-                    if (ev.docs && Array.isArray(ev.docs)) {
-                        ev.docs.forEach((d: string) => { if (!localDocs.includes(d)) localDocs.push(d); });
-                        setDocsStatus([...localDocs]);
-                    }
-                    const docCount = ev.docs?.length || 0;
-                    logs.push({ message: `Reading ${docCount > 0 ? docCount + ' doc' + (docCount === 1 ? '' : 's') : 'project documentation'}...`, type: 'done' });
-                    setStatusLog([...logs]);
-                } else if (ev.event === 'model') {
-                    const modelLabel = ev.model || 'AI';
-                    // Parse agent count from model label (e.g., "3 agents" or "single agent")
-                    const agentMatch = modelLabel.match(/(\d+)\s*agent/i);
-                    if (agentMatch) {
-                        setAgentCount(parseInt(agentMatch[1]));
-                    } else if (modelLabel.toLowerCase().includes('single')) {
-                        setAgentCount(1);
-                    }
-                    logs.push({ message: `Generating with ${modelLabel}...`, type: 'pending' });
-                    setStatusLog([...logs]);
-                } else if (ev.event === 'file') {
-                    streamedFiles = true;
-                    const isNew = ev.op === 'created';
-                    setGeneratedFiles(prev => {
-                        const seen = prev.created.includes(ev.path) || prev.edited.includes(ev.path);
-                        if (seen) return prev;
-                        return {
-                            created: isNew ? [...prev.created, ev.path] : prev.created,
-                            edited: isNew ? prev.edited : [...prev.edited, ev.path]
-                        };
-                    });
-                    if (ev.content && onFileStream) {
-                        onFileStream({ path: ev.path, content: ev.content });
-                    }
-                    logs.push({ message: `${isNew ? '+' : '~'} ${isNew ? 'Created' : 'Edited'} ${ev.path}`, type: 'done' });
-                    setStatusLog([...logs]);
-                } else if (ev.event === 'command') {
-                    if (ev.status === 'running') {
-                        logs.push({ message: `Running command: ${ev.command}`, type: 'pending' });
-                    } else {
-                        const entry = { command: ev.command, status: ev.status === 'done' ? 'done' : 'error', output: ev.output };
-                        const existing = localCommands.findIndex(c => c.command === ev.command);
-                        if (existing >= 0) localCommands[existing] = entry;
-                        else localCommands.push(entry);
-                        setCommandStatus([...localCommands]);
-                        logs.push({ message: `Command ${ev.status === 'done' ? 'completed' : 'failed'}: ${ev.command}`, type: ev.status === 'done' ? 'done' : 'error' });
-                    }
-                    setStatusLog([...logs]);
-                } else if (ev.event === 'download') {
-                    if (!localDownloads.some(d => d.url === ev.url)) {
-                        localDownloads.push({ url: ev.url, path: ev.path || '', success: ev.success !== false });
-                        setDownloadStatus([...localDownloads]);
-                    }
-                    logs.push({ message: `Downloaded ${ev.success !== false ? '' : '(failed) '}${ev.path || ev.url}`, type: ev.success !== false ? 'done' : 'error' });
-                    setStatusLog([...logs]);
-                }
-            };
-
             result = await aiApi.generate(
                 optimizedPrompt, language, model, sessionId || undefined, platform, abortControllerRef.current?.signal,
                 enableWebSearch,
@@ -789,8 +826,7 @@ export const ChatPanel = ({
                 fileContextEntries.length > 0 ? fileContextEntries : undefined,
                 effectiveChatMode,
                 Boolean(approvedPlanId),
-                approvedPlanId,
-                onProgress
+                approvedPlanId
             );
         } catch (fetchErr: any) {
             if (fetchErr.name === 'AbortError') {
@@ -800,8 +836,11 @@ export const ChatPanel = ({
                 showNotification(fetchErr.message || 'Failed to connect to server', 'error');
             }
             setLoading(false);
+            setRunningTool(null);
             return;
         }
+
+        setRunningTool(null);
 
         if (result.error) {
             setStatusLog([{ message: `Error: ${result.error}`, type: 'error' }]);
@@ -822,7 +861,6 @@ export const ChatPanel = ({
             }
         }
 
-        // Show web search status if available
         if (result.searchQueries && result.searchQueries.length > 0) {
             setSearchStatus({
                 queries: result.searchQueries,
@@ -831,20 +869,13 @@ export const ChatPanel = ({
         }
 
         if (effectiveChatMode) {
-            // Chat mode: just show conversational response
             logs[logs.length - 1] = { message: 'Response ready', type: 'done' };
             setStatusLog([...logs]);
+            setCompletedTodos(todos.length || 1);
+            setStepCount(s => s + 1);
             setMessages(prev => [
                 ...prev,
-                {
-                    role: 'assistant',
-                    content: result.rawResponse,
-                    metadata: {
-                        search: result.searchQueries?.length
-                            ? { queries: result.searchQueries, sources: result.searchSources || [] }
-                            : undefined
-                    }
-                }
+                { role: 'assistant', content: result.rawResponse }
             ]);
         } else if (result.files && result.files.length > 0) {
             const created: string[] = [];
@@ -856,67 +887,52 @@ export const ChatPanel = ({
                 else edited.push(file.path);
             }
 
-            if (streamedFiles) {
-                // Files were already revealed live via SSE — just confirm completion
-                setGeneratedFiles({ created, edited });
-                logs.push({ message: `${platformLabel} ${modeLabel} assembly complete!`, type: 'done' });
-                setStatusLog([...logs]);
-            } else {
-                const fileLogs: { message: string; type: 'pending' | 'done' | 'error' }[] = [
-                    { message: 'Request analyzed', type: 'done' },
-                    { message: `Documentation matched (${skillLabel})`, type: 'done' },
-                    { message: 'Architecture planned', type: 'done' }
-                ];
+            const fileLogs: { message: string; type: 'pending' | 'done' | 'error' }[] = [
+                { message: 'Request analyzed', type: 'done' },
+                { message: `Documentation matched (${skillLabel})`, type: 'done' },
+                { message: 'Architecture planned', type: 'done' }
+            ];
+            setStatusLog([...fileLogs]);
+            setCompletedTodos(2);
+            setStepCount(3);
+
+            const revealCreated: string[] = [];
+            const revealEdited: string[] = [];
+
+            for (let i = 0; i < result.files.length; i++) {
+                const file = result.files[i];
+                const isNew = file.content && !file.content.startsWith('// Edit');
+                const opLabel = isNew ? 'Created' : 'Edited';
+
+                if (isNew) revealCreated.push(file.path);
+                else revealEdited.push(file.path);
+
+                setGeneratedFiles({ created: [...revealCreated], edited: [...revealEdited] });
+
+                setRunningTool(`${opLabel} ${file.path.split('/').pop()}`);
+                fileLogs.push({ message: `${isNew ? '+' : '~'} ${opLabel} ${file.path}`, type: 'pending' });
                 setStatusLog([...fileLogs]);
-
-                // Progressively reveal files one by one
-                const revealCreated: string[] = [];
-                const revealEdited: string[] = [];
-
-                for (let i = 0; i < result.files.length; i++) {
-                    const file = result.files[i];
-                    const isNew = file.content && !file.content.startsWith('// Edit');
-                    const opLabel = isNew ? 'Created' : 'Edited';
-                    const opIcon = isNew ? '+' : '~';
-
-                    if (isNew) revealCreated.push(file.path);
-                    else revealEdited.push(file.path);
-
-                    setGeneratedFiles({ created: [...revealCreated], edited: [...revealEdited] });
-
-                    fileLogs.push({ message: `${opIcon} ${opLabel} ${file.path}`, type: 'pending' });
-                    setStatusLog([...fileLogs]);
-                    await new Promise(r => setTimeout(r, 120));
-                    fileLogs[fileLogs.length - 1] = { message: `${opIcon} ${opLabel} ${file.path}`, type: 'done' };
-                    setStatusLog([...fileLogs]);
-                }
-
-                fileLogs.push({ message: `${platformLabel} ${modeLabel} assembly complete!`, type: 'done' });
+                await new Promise(r => setTimeout(r, 120));
+                fileLogs[fileLogs.length - 1] = { message: `${isNew ? '+' : '~'} ${opLabel} ${file.path}`, type: 'done' };
                 setStatusLog([...fileLogs]);
+                setStepCount(4 + i);
             }
 
-            // Build summary message instead of showing raw code
-            const createdCount = created.length;
-            const editedCount = edited.length;
-            const docsCount = localDocs.length;
+            setRunningTool(null);
+            fileLogs.push({ message: `${platformLabel} ${modeLabel} assembly complete!`, type: 'done' });
+            setStatusLog([...fileLogs]);
+            setCompletedTodos(4);
+
+            const createdCount = revealCreated.length;
+            const editedCount = revealEdited.length;
             let summaryParts: string[] = [];
             if (createdCount > 0) summaryParts.push(`${createdCount} file${createdCount > 1 ? 's' : ''} created`);
             if (editedCount > 0) summaryParts.push(`${editedCount} file${editedCount > 1 ? 's' : ''} edited`);
-            if (docsCount > 0) summaryParts.push(`${docsCount} doc${docsCount === 1 ? '' : 's'} read`);
             const summaryText = `Done! I ${summaryParts.join(' and ')}. Check the files panel to see the generated code.`;
 
             setMessages(prev => [
                 ...prev,
-                { role: 'assistant', content: summaryText, files: result.files, message_type: 'build', metadata: {
-                    files: result.files.map((file: any) => ({ path: file.path, size: file.content?.length || 0 })),
-                    created,
-                    edited,
-                    search: localSearch.queries.length > 0 ? localSearch : undefined,
-                    docs: localDocs.length > 0 ? localDocs : undefined,
-                    commands: localCommands.length > 0 ? localCommands : undefined,
-                    downloads: localDownloads.length > 0 ? localDownloads : undefined,
-                    status: 'completed'
-                } }
+                { role: 'assistant', content: summaryText, files: result.files, message_type: 'build', metadata: { files: result.files.map((file: any) => ({ path: file.path, size: file.content?.length || 0 })), status: 'completed' } }
             ]);
 
             await new Promise(r => setTimeout(r, 400));
@@ -958,14 +974,23 @@ export const ChatPanel = ({
         setPlanningData({ plan: planMessage?.metadata?.plan || planMessage?.planData, questions: planMessage?.metadata?.questions || [] });
         setSelectedAnswers(answers);
         setPlanApproved(true);
-        setExecMode('build');
         await runBuildGeneration(planPrompt || messages.filter(message => message.role === 'user').slice(-1)[0]?.content || '', messageId > 0 ? messageId : undefined);
+    };
+
+    const handleClearLog = () => {
+        setStatusLog([]);
+        setGeneratedFiles({ created: [], edited: [] });
+        setTodos([]);
+        setCompletedTodos(0);
+        setStepCount(0);
+        setRunningTool(null);
+        if (statusLogKey) try { localStorage.removeItem(statusLogKey); } catch {}
+        if (generatedFilesKey) try { localStorage.removeItem(generatedFilesKey); } catch {}
     };
 
     if (compact) {
         return (
             <div className="relative flex flex-col min-h-[150px] justify-between" onDragOver={handleDragOver} onDrop={handleDrop}>
-                {/* Attached files preview (compact) */}
                 {attachedFiles.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 px-5 pt-3">
                         {attachedFiles.map((f, i) => (
@@ -979,8 +1004,6 @@ export const ChatPanel = ({
                         ))}
                     </div>
                 )}
-
-                {/* Hidden file input (compact) */}
                 <input
                     ref={fileInputRef}
                     type="file"
@@ -989,21 +1012,14 @@ export const ChatPanel = ({
                     onChange={handleFileSelect}
                     className="hidden"
                 />
-
                 <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSend();
-                        }
-                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                     disabled={loading}
                     className="w-full bg-transparent border-0 px-5 pt-5 text-sm focus:outline-none resize-none h-[80px] placeholder:text-foreground/30 text-foreground"
                     placeholder={chatMode ? "Ask me anything..." : isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : attachedFiles.length > 0 ? "Add a message about the uploaded files..." : "Ask Velix to create a plugin about..."}
                 />
-
                 {statusLog.length > 0 && (
                     <div className="px-5 pb-3 space-y-1">
                         {statusLog.map((log, i) => (
@@ -1018,7 +1034,6 @@ export const ChatPanel = ({
                         ))}
                     </div>
                 )}
-
                 <div className="flex items-center justify-between px-4 pb-3 pt-2 border-t border-[hsl(var(--surface-sunk))]/40">
                     <div className="flex items-center gap-2">
                         <button
@@ -1055,7 +1070,6 @@ export const ChatPanel = ({
                         {modelDropdown}
                         {typeDropdown}
                     </div>
-
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleEnhance}
@@ -1084,60 +1098,34 @@ export const ChatPanel = ({
 
     return (
         <div className="relative flex-1 flex flex-col h-full overflow-hidden">
-            <div className="flex items-center justify-end gap-2 px-3 py-2 border-b border-white/5">
-                <button onClick={async () => { if (sessionId && await showConfirm({ title: 'Clear conversation', message: 'Clear this project conversation? This cannot be undone.', danger: true })) { const result = await aiApi.clearMessages(sessionId); if (!result.error) { setMessages([]); setPlanningData(null); } } }} className="rounded-lg px-2 py-1 text-[10px] text-zinc-500 hover:text-red-300">Clear</button>
+            {/* Header bar */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
+                <div className="flex items-center gap-2">
+                    {agentCount > 0 && (
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold bg-violet-500/20 text-violet-300 rounded-full border border-violet-500/30">
+                            {agentCount} agent{agentCount !== 1 ? 's' : ''}
+                        </span>
+                    )}
+                </div>
+                <button
+                    onClick={async () => {
+                        if (sessionId && window.confirm('Clear this project conversation? This cannot be undone.')) {
+                            const result = await aiApi.clearMessages(sessionId);
+                            if (!result.error) {
+                                setMessages([]);
+                                setPlanningData(null);
+                                handleClearLog();
+                            }
+                        }
+                    }}
+                    className="rounded-lg px-2 py-1 text-[10px] text-zinc-500 hover:text-red-300 transition-colors"
+                >
+                    Clear
+                </button>
             </div>
 
-            {/* Floating AI Reasoning Bar */}
-            {loading && statusLog.length > 0 && (
-                <div className="relative mx-3 mt-2 mb-1 rounded-lg overflow-hidden z-20">
-                    {/* Animated multi-color border */}
-                    <div className="absolute inset-0 rounded-lg pointer-events-none">
-                        <div className="absolute inset-0 rounded-lg opacity-75" style={{
-                            padding: '1px',
-                            background: 'linear-gradient(90deg, #ff0080, #ff8c00, #40e0d0, #7b68ee, #ff0080)',
-                            backgroundSize: '300% 100%',
-                            animation: 'rainbow 3s linear infinite',
-                            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                            WebkitMaskComposite: 'xor',
-                            maskComposite: 'exclude',
-                        }} />
-                    </div>
-                    <style>{`
-                        @keyframes rainbow {
-                            0% { background-position: 0% 50%; }
-                            100% { background-position: 300% 50%; }
-                        }
-                    `}</style>
-                    <div className="relative z-10 bg-[#10151b] px-3 py-2">
-                        <div className="flex items-center gap-2">
-                            <Brain className="h-3.5 w-3.5 animate-pulse text-violet-300" />
-                            <span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">AI reasoning</span>
-                            {agentCount > 0 && (
-                                <span className="px-1.5 py-0.5 text-[8px] font-bold bg-violet-500/20 text-violet-300 rounded-full border border-violet-500/30">
-                                    {agentCount} agent{agentCount !== 1 ? 's' : ''}
-                                </span>
-                            )}
-                            <span className="text-[9px] text-zinc-500">Working…</span>
-                            <Loader2 className="h-3 w-3 animate-spin text-sky-400 ml-auto" />
-                        </div>
-                        {statusLog.length > 0 && (
-                            <div className="mt-1.5 max-h-[40px] overflow-y-auto">
-                                {statusLog.slice(-2).map((log, i) => (
-                                    <div key={i} className="flex items-center gap-1.5 text-[9px]">
-                                        {log.type === 'done' ? <Check className="h-2.5 w-2.5 shrink-0 text-emerald-400" /> :
-                                         log.type === 'error' ? <AlertCircle className="h-2.5 w-2.5 shrink-0 text-red-400" /> :
-                                         <Loader2 className="h-2.5 w-2.5 shrink-0 animate-spin text-sky-400" />}
-                                        <span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-500' : 'text-zinc-400'}>{log.message}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            <div ref={scrollRef} className="flex-1 overflow-y-auto mb-2 space-y-2">
+            {/* Messages area */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto mb-2 space-y-2 px-1">
                 {messages.length === 0 && statusLog.length === 0 && !buildResult && (
                     <div className="flex flex-col items-center justify-center h-full text-center px-4">
                         <Sparkles className="w-5 h-5 text-muted mb-2" />
@@ -1146,8 +1134,8 @@ export const ChatPanel = ({
                     </div>
                 )}
 
-                {/* Legacy source pills are retained only for backwards-compatible DOM styling. */}
-                {(searchStatus?.queries.length || 0) > 0 && (
+                {/* Web search status */}
+                {false && (searchStatus?.queries.length || 0) > 0 && (
                     <div className="mx-2 mb-2 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 animate-in fade-in duration-200">
                         <div className="flex items-center gap-2 mb-2">
                             <Globe className="w-3.5 h-3.5 text-blue-400" />
@@ -1179,125 +1167,164 @@ export const ChatPanel = ({
                     </div>
                 )}
 
-{messages.map((msg, i) => {
-    return (
-        <React.Fragment key={i}>
-            <ChatMessage
-                id={msg.id}
-                role={msg.role}
-                content={msg.content}
-                created_at={msg.created_at}
-                attachments={msg.attachments}
-                messageType={msg.message_type}
-                metadata={msg.metadata || { plan: msg.planData, questions: msg.questions }}
-                onSavePlan={handleSavePlan}
-                onApprovePlan={handleApprovePlan}
-                onOpenPlan={onOpenPlanFile}
-                onOpenFile={onOpenFile}
-            />
-        </React.Fragment>
-    );
-})}
+                {/* Messages */}
+                {messages.map((msg, i) => {
+                    const isLast = i === messages.length - 1;
+                    const showFileChips = isLast && msg.role === 'assistant' && generatedFiles.created.length + generatedFiles.edited.length > 0;
+                    return (
+                        <React.Fragment key={i}>
+                            <ChatMessage
+                                id={msg.id}
+                                role={msg.role}
+                                content={msg.content}
+                                created_at={msg.created_at}
+                                attachments={msg.attachments}
+                                messageType={msg.message_type}
+                                metadata={msg.metadata || { plan: msg.planData, questions: msg.questions }}
+                                onSavePlan={handleSavePlan}
+                                onApprovePlan={handleApprovePlan}
+                                onOpenPlan={onOpenPlanFile}
+                            />
+                            {showFileChips && (
+                                <FileChipsSummary created={generatedFiles.created} edited={generatedFiles.edited} />
+                            )}
+                        </React.Fragment>
+                    );
+                })}
 
-{loading && (
-    <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
-        <FilesChangedBox files={undefined} created={generatedFiles.created} edited={generatedFiles.edited} onOpenFile={onOpenFile} />
-        <SearchBox search={searchStatus || undefined} />
-        <DocsBox docs={docsStatus} checked={docsChecked} />
-        <CommandsBox commands={commandStatus} />
-        <DownloadsBox downloads={downloadStatus} />
-    </div>
-)}
+                {/* Loading state: Collapsible sections */}
+                {loading && (
+                    <div className="mx-3 space-y-2 animate-in fade-in duration-200">
+                        {/* Steps counter */}
+                        {stepCount > 0 && <StepsCounter count={stepCount} />}
 
+                        {/* Running tool indicator */}
+                        {runningTool && (
+                            <RunningToolIndicator label={runningTool} elapsed={elapsedSeconds} />
+                        )}
 
+                        {/* Streaming indicator (when no specific tool) */}
+                        {!runningTool && statusLog.length > 0 && (
+                            <StreamingIndicator elapsed={elapsedSeconds} />
+                        )}
+                    </div>
+                )}
+
+                {/* Completed state: Collapsible sections */}
+                {!loading && statusLog.length > 0 && (
+                    <div className="mx-3 space-y-2 animate-in fade-in duration-200">
+                        {/* Steps counter */}
+                        {stepCount > 0 && <StepsCounter count={stepCount} />}
+
+                        {/* To-dos section (collapsible) */}
+                        {todos.length > 0 && (
+                            <CollapsibleSection
+                                title="To-dos"
+                                icon={<ListChecks className="w-3.5 h-3.5 text-zinc-400" />}
+                                count={completedTodos}
+                                defaultOpen={false}
+                            >
+                                <TodosChecklist todos={todos} completedCount={completedTodos} />
+                            </CollapsibleSection>
+                        )}
+
+                        {/* File changes section */}
+                        {(generatedFiles.created.length > 0 || generatedFiles.edited.length > 0) && (
+                            <CollapsibleSection
+                                title="File changes"
+                                icon={<FileCode className="w-3.5 h-3.5 text-zinc-400" />}
+                                count={generatedFiles.created.length + generatedFiles.edited.length}
+                                defaultOpen={false}
+                            >
+                                <div className="space-y-1">
+                                    {generatedFiles.created.map((path, i) => (
+                                        <FileBadge key={`c-${i}`} path={path} />
+                                    ))}
+                                    {generatedFiles.edited.map((path, i) => (
+                                        <FileBadge key={`e-${i}`} path={path} edited />
+                                    ))}
+                                </div>
+                            </CollapsibleSection>
+                        )}
+
+                        {/* Reasoning section */}
+                        {statusLog.length > 0 && (
+                            <CollapsibleSection
+                                title="Reasoning"
+                                icon={<Brain className="w-3.5 h-3.5 text-zinc-400" />}
+                                defaultOpen={false}
+                            >
+                                <div className="space-y-1">
+                                    {statusLog.map((log, i) => (
+                                        <div key={i} className="flex items-center gap-2 text-[11px]">
+                                            {log.type === 'done' && <Check className="w-3 h-3 text-emerald-400 shrink-0" />}
+                                            {log.type === 'error' && <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />}
+                                            {log.type === 'pending' && <Loader2 className="w-3 h-3 animate-spin text-sky-400 shrink-0" />}
+                                            <span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-500' : 'text-zinc-400'}>
+                                                {log.message}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CollapsibleSection>
+                        )}
+                    </div>
+                )}
+
+                {/* Build result */}
                 {compiling && !buildResult && (
-                    <div className="animate-in fade-in duration-200 rounded-xl border border-[hsl(var(--surface-sunk))] overflow-hidden">
-                        <div className="flex items-center justify-between px-3 py-2 bg-[hsl(var(--surface-sunk))]">
-                            <div className="flex items-center gap-2">
-                                <Hammer className="w-3 h-3 text-muted" />
-                                <span className="text-[11px] font-medium text-muted">build</span>
-                                <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-green-500/15 text-success rounded animate-pulse">RUNNING</span>
-                            </div>
+                    <div className="mx-3 animate-in fade-in duration-200 rounded-lg border border-white/[.08] overflow-hidden bg-[#10151b]/80">
+                        <div className="flex items-center gap-2 px-3 py-2">
+                            <Hammer className="w-3.5 h-3.5 text-zinc-400" />
+                            <span className="text-[11px] font-semibold text-zinc-300">build</span>
+                            <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-emerald-500/15 text-emerald-400 rounded animate-pulse">RUNNING</span>
                         </div>
-                        <div className="px-3 py-2 bg-[hsl(var(--surface))]/50 space-y-1">
-                            <div className="flex items-center gap-2 text-[10px] font-mono text-foreground/70">
-                                <span className="text-green-500">$</span>
+                        <div className="px-3 pb-2 space-y-1">
+                            <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                                <span className="text-emerald-400">$</span>
                                 <span>{language === 'kotlin' ? 'gradle build --no-daemon' : language === 'java' ? 'mvn clean package -DskipTests' : 'compile --target plugin'}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-[10px] font-mono text-foreground/40">
-                                <span className="text-green-500">&gt;</span>
-                                <span>Resolving dependencies...</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-[10px] font-mono text-foreground/40">
-                                <span className="text-green-500">&gt;</span>
-                                <span>Compiling sources...</span>
-                                <span className="inline-block w-1.5 h-3 bg-foreground/30 animate-pulse" />
-                            </div>
-                            <div className="mt-2 h-1 w-full rounded-full bg-[hsl(var(--surface-sunk))] overflow-hidden">
-                                <div className="h-full bg-primary rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite]" style={{ width: '60%' }} />
+                            <div className="h-1 w-full rounded-full bg-zinc-800 overflow-hidden mt-2">
+                                <div className="h-full bg-emerald-500 rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite]" style={{ width: '60%' }} />
                             </div>
                         </div>
                     </div>
                 )}
 
                 {buildResult && (
-                    <div className="animate-in fade-in duration-200 rounded-xl border border-[hsl(var(--surface-sunk))] overflow-hidden">
-                        <div className="flex items-center justify-between px-3 py-2 bg-[hsl(var(--surface-sunk))]">
+                    <div className="mx-3 animate-in fade-in duration-200 rounded-lg border border-white/[.08] overflow-hidden bg-[#10151b]/80">
+                        <div className="flex items-center justify-between px-3 py-2">
                             <div className="flex items-center gap-2">
-                                <Hammer className="w-3 h-3 text-muted" />
-                                <span className="text-[11px] font-medium text-muted">Build</span>
+                                <Hammer className="w-3.5 h-3.5 text-zinc-400" />
+                                <span className="text-[11px] font-semibold text-zinc-300">Build</span>
                                 {buildResult.success ? (
-                                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-green-500/15 text-success rounded">OK</span>
+                                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-emerald-500/15 text-emerald-400 rounded">OK</span>
                                 ) : (
-                                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-red-500/15 text-danger rounded">FAIL</span>
+                                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-red-500/15 text-red-400 rounded">FAIL</span>
                                 )}
                             </div>
                             <div className="flex items-center gap-1">
-                                <button onClick={async () => {
-                                    const text = buildResult.log || '';
-                                    if (!text) { showNotification('No error to copy', 'error'); return; }
-                                    try {
-                                        await navigator.clipboard.writeText(text);
-                                        showNotification('Copied!', 'success');
-                                    } catch {
-                                        // fallback
-                                        const ta = document.createElement('textarea');
-                                        ta.value = text;
-                                        ta.style.cssText = 'position:fixed;left:-9999px';
-                                        document.body.appendChild(ta);
-                                        ta.select();
-                                        document.execCommand('copy');
-                                        document.body.removeChild(ta);
-                                        showNotification('Copied!', 'success');
-                                    }
-                                }} className="p-1 rounded text-muted hover:text-foreground transition-colors" title="Copy error">
+                                <button onClick={async () => { if (await copyToClipboard(buildResult.log || '')) showNotification('Copied.', 'success'); else showNotification('Copy failed', 'error'); }} className="p-1 rounded text-zinc-500 hover:text-zinc-300 transition-colors" title="Copy log">
                                     <Copy className="w-3 h-3" />
                                 </button>
-                                <button onClick={onClearBuildResult} className="p-1 rounded text-muted hover:text-foreground transition-colors">
+                                <button onClick={onClearBuildResult} className="p-1 rounded text-zinc-500 hover:text-zinc-300 transition-colors">
                                     <X className="w-3 h-3" />
                                 </button>
                             </div>
                         </div>
                         {buildResult.log && (
-                            <div className="px-3 py-2 max-h-[60px] overflow-y-auto bg-[hsl(var(--surface))]/50">
-                                {buildResult.log.split('\n').slice(0, 50).map((line: string, i: number) => {
-                                    const isError = /error|exception|fail|cannot|not found|undefined|invalid/i.test(line);
-                                    return (
-                                        <div key={i} className={`text-[10px] font-mono leading-relaxed whitespace-pre-wrap break-words ${isError ? 'text-red-400 font-medium' : 'text-muted'}`}>
-                                            {line}
-                                        </div>
-                                    );
-                                })}
+                            <div className="px-3 pb-2 max-h-[150px] overflow-y-auto">
+                                <pre className="text-[10px] font-mono leading-relaxed text-zinc-500 whitespace-pre-wrap break-words">{buildResult.log}</pre>
                             </div>
                         )}
-                        <div className="flex items-center gap-2 px-3 py-2 border-t border-[hsl(var(--surface-sunk))]">
+                        <div className="flex items-center gap-2 px-3 py-2 border-t border-white/[.06]">
                             {buildResult.success && buildResult.historyId && onDownloadArtifact && (
-                                <button onClick={() => onDownloadArtifact(buildResult.historyId!)} className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-background bg-foreground rounded-lg hover:opacity-90 transition-all">
+                                <button onClick={() => onDownloadArtifact(buildResult.historyId!)} className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-zinc-900 bg-emerald-400 rounded-lg hover:bg-emerald-300 transition-all">
                                     <Download className="w-3 h-3" /> JAR
                                 </button>
                             )}
                             {!buildResult.success && onAutoFix && (
-                                <button onClick={() => onAutoFix(buildResult.log || '')} className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-background bg-foreground rounded-lg hover:opacity-90 transition-all">
+                                <button onClick={() => onAutoFix(buildResult.log)} className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-zinc-900 bg-amber-400 rounded-lg hover:bg-amber-300 transition-all">
                                     <Sparkles className="w-3 h-3" /> Auto-fix
                                 </button>
                             )}
@@ -1305,99 +1332,19 @@ export const ChatPanel = ({
                     </div>
                 )}
 
-                {false && statusLog.length > 0 && (
-                    <div className="px-3 py-2 space-y-1 animate-in fade-in duration-200">
-                        <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-1.5">
-                                <Loader2 className={`w-3 h-3 text-primary ${loading ? 'animate-spin' : ''}`} />
-                                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-                                    {loading ? 'Working...' : 'Done'}
-                                </span>
-                            </div>
-                            {!loading && (
-                                <button onClick={() => { setStatusLog([]); setGeneratedFiles({ created: [], edited: [] }); if (statusLogKey) try { localStorage.removeItem(statusLogKey); } catch {} if (generatedFilesKey) try { localStorage.removeItem(generatedFilesKey); } catch {} }} className="text-[10px] text-muted hover:text-foreground transition-colors px-1.5 py-0.5 rounded">
-                                    Clear
-                                </button>
-                            )}
-                        </div>
-                        {statusLog.map((log, i) => (
-                            <div key={i} className="flex items-center gap-2 py-0.5">
-                                <div className={`w-3 h-3 rounded-full flex items-center justify-center shrink-0 ${log.type === 'done' ? 'bg-green-500/15' :
-                                    log.type === 'error' ? 'bg-red-500/15' :
-                                        'bg-primary/10'
-                                    }`}>
-                                    {log.type === 'done' && <Check className="w-2 h-2 text-success" />}
-                                    {log.type === 'error' && <AlertCircle className="w-2 h-2 text-danger" />}
-                                    {log.type === 'pending' && (
-                                        <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
-                                    )}
-                                </div>
-                                <span className={`text-[11px] ${log.type === 'done' ? 'text-success/80' :
-                                    log.type === 'error' ? 'text-danger' :
-                                        'text-muted'
-                                    }`}>
-                                    {log.message}
-                                </span>
-                            </div>
-                        ))}
+                {/* Message queued */}
+                {loading && (
+                    <div className="mx-3">
+                        <MessageQueuedBar />
                     </div>
                 )}
 
                 <div ref={messagesEndRef} />
             </div>
 
-            {scrolledDown && statusLog.length > 0 && (
-                <button type="button" onClick={() => setReasoningPopupOpen(true)} className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-violet-400/30 bg-[#10151b]/95 px-3 py-1.5 text-[11px] text-violet-200 shadow-[0_8px_24px_rgba(0,0,0,.4)] backdrop-blur transition-colors hover:border-violet-400/60">
-                    {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-300" /> : <Brain className="h-3.5 w-3.5 text-violet-300" />}
-                    <span>{loading ? 'AI working…' : 'AI reasoning'}</span>
-                    <span className="text-[10px] text-zinc-500">{statusLog.length} step{statusLog.length === 1 ? '' : 's'}</span>
-                    <ChevronDown className="h-3 w-3 rotate-180 text-zinc-500" />
-                </button>
-            )}
-
-            {reasoningPopupOpen && statusLog.length > 0 && (
-                <div className="absolute inset-0 z-30 flex items-center justify-center p-6" onClick={() => setReasoningPopupOpen(false)}>
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-                    <div className="relative w-full max-w-md overflow-hidden rounded-xl bg-[#10151b] shadow-2xl" onClick={e => e.stopPropagation()}>
-                        {/* Animated multi-color border */}
-                        <div className="absolute inset-0 rounded-xl pointer-events-none">
-                            <div className="absolute inset-0 rounded-xl animate-[rainbow_3s_linear_infinite] opacity-75" style={{
-                                padding: '1px',
-                                background: 'linear-gradient(90deg, #ff0080, #ff8c00, #40e0d0, #7b68ee, #ff0080)',
-                                backgroundSize: '300% 100%',
-                                animation: 'rainbow 3s linear infinite',
-                                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                                WebkitMaskComposite: 'xor',
-                                maskComposite: 'exclude',
-                            }} />
-                        </div>
-                        <style>{`
-                            @keyframes rainbow {
-                                0% { background-position: 0% 50%; }
-                                100% { background-position: 300% 50%; }
-                            }
-                        `}</style>
-                        <div className="relative z-10 flex items-center justify-between border-b border-white/[.06] px-4 py-2.5">
-                            <span className="flex items-center gap-2">
-                                <Brain className={`h-4 w-4 ${loading ? 'animate-pulse text-violet-300' : 'text-sky-300'}`} />
-                                <span className="text-[11px] font-semibold uppercase tracking-[.12em] text-zinc-200">AI reasoning</span>
-                                {agentCount > 0 && (
-                                    <span className="px-1.5 py-0.5 text-[8px] font-bold bg-violet-500/20 text-violet-300 rounded-full border border-violet-500/30">
-                                        {agentCount} agent{agentCount !== 1 ? 's' : ''}
-                                    </span>
-                                )}
-                                <span className="text-[10px] text-zinc-500">{loading ? 'Working…' : 'Complete'}</span>
-                            </span>
-                            <button type="button" onClick={() => setReasoningPopupOpen(false)} className="rounded p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-200"><X className="h-4 w-4" /></button>
-                        </div>
-                        <div className="relative z-10 max-h-[60vh] divide-y divide-white/[.055] overflow-y-auto">{statusLog.map((log, i) => <div key={`pop-${log.message}-${i}`} className="flex items-center gap-2 px-4 py-2 text-[11px]">{log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}<span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}>{log.message}</span></div>)}</div>
-                    </div>
-                </div>
-            )}
-
+            {/* Input area */}
             <div className="mt-auto px-1 pb-1">
                 <div className={`relative rounded-2xl transition-all duration-500 ${loading ? 'p-[1px]' : ''}`} onDragOver={handleDragOver} onDrop={handleDrop}>
-                    {/* Glowing rotating border during generation */}
                     {loading && (
                         <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
                             <div className="absolute inset-[-50%] animate-[spin_3s_linear_infinite]" style={{
@@ -1406,159 +1353,125 @@ export const ChatPanel = ({
                         </div>
                     )}
                     <div className={`relative ${loading ? 'm-[1px] rounded-[15px] bg-[hsl(var(--surface))]' : ''}`}>
-                    {/* Attached files preview */}
-                    {attachedFiles.length > 0 && (
-                        <div className="flex flex-wrap gap-1 md:gap-1.5 mb-2 px-2">
-                            {attachedFiles.map((f, i) => (
-                                <div key={i} className="flex items-center gap-1 md:gap-1.5 px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] md:text-[11px] text-foreground group">
-                                    {f.type.startsWith('image/') ? <Image className="w-3 h-3 text-primary shrink-0" /> : <FileCode className="w-3 h-3 text-primary shrink-0" />}
-                                    <span className="truncate max-w-[80px] md:max-w-[120px]">{f.name}</span>
-                                    <span className="text-muted text-[9px] md:text-[10px] hidden sm:inline">{formatFileSize(f.size)}</span>
-                                    <button onClick={() => removeAttachedFile(i)} className="p-0.5 rounded hover:bg-white/10 text-muted hover:text-foreground transition-colors sm:opacity-0 sm:group-hover:opacity-100">
-                                        <Trash2 className="w-2.5 h-2.5" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Hidden file input */}
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.txt,.md,.log,.csv,.mcfunction,.js,.jsx,.mjs,.ts,.tsx,.java,.kt,.kts,.py,.yml,.yaml,.json,.xml,.gradle,.properties,.toml,.sh,.cfg,.conf,.ini"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                    />
-
-                    <textarea
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSend();
-                            }
-                        }}
-                        placeholder={execMode === 'chat' ? "Ask me anything..." : isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : attachedFiles.length > 0 ? "Add a message about the uploaded files..." : "Describe what you want to build..."}
-                        className="neu-input w-full text-xs text-foreground rounded-2xl p-3 md:p-4 pr-16 md:pr-20 outline-none transition-all resize-none h-16 md:h-20"
-                    />
-                    <div className="absolute right-2 md:right-3 bottom-2 md:bottom-3 flex items-center gap-1 md:gap-1.5 z-20">
-                        {/* Model Selector Dropdown */}
-                        {modelDropdown ? modelDropdown : (
-                            <ModelSelector selectedModel={model} onSelectModel={() => {}} />
-                        )}
-
-                        {/* Mode Selector Dropdown (Build / Plan / Chat) */}
-                        <div className="relative">
-                            <button
-                                type="button"
-                                onClick={() => setShowExecModeDropdown(!showExecModeDropdown)}
-                                className="rounded-full border border-white/10 bg-[hsl(var(--surface-sunk))] px-2 md:px-2.5 py-1 text-[10px] md:text-[11px] text-foreground/80 flex items-center gap-1 hover:bg-white/10 hover:text-foreground transition-all font-semibold"
-                                title="Execution mode"
-                            >
-                                <span className="capitalize">{execMode === 'build' ? 'Build' : execMode === 'plan' ? 'Plan' : 'Chat'}</span>
-                                <ChevronDown className="w-3 h-3 text-muted" />
-                            </button>
-                            {showExecModeDropdown && (
-                                <div className="absolute bottom-full right-0 mb-2 w-36 rounded-xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] p-1.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setExecMode('build');
-                                            setChatMode(false);
-                                            setShowExecModeDropdown(false);
-                                        }}
-                                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between ${execMode === 'build' ? 'bg-primary/10 text-primary font-bold' : 'text-foreground/80 hover:bg-[hsl(var(--surface-sunk))]'}`}
-                                    >
-                                        <span>Build Mode</span>
-                                        {execMode === 'build' && <Check className="w-3.5 h-3.5 text-primary" />}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setExecMode('plan');
-                                            setChatMode(false);
-                                            setShowExecModeDropdown(false);
-                                        }}
-                                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between ${execMode === 'plan' ? 'bg-purple-500/10 text-purple-400 font-bold' : 'text-foreground/80 hover:bg-[hsl(var(--surface-sunk))]'}`}
-                                    >
-                                        <span>Plan Mode</span>
-                                        {execMode === 'plan' && <Check className="w-3.5 h-3.5 text-purple-400" />}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setExecMode('chat');
-                                            setChatMode(true);
-                                            setShowExecModeDropdown(false);
-                                        }}
-                                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between ${execMode === 'chat' ? 'bg-emerald-500/10 text-emerald-400 font-bold' : 'text-foreground/80 hover:bg-[hsl(var(--surface-sunk))]'}`}
-                                    >
-                                        <span>Chat Mode</span>
-                                        {execMode === 'chat' && <Check className="w-3.5 h-3.5 text-emerald-400" />}
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={loading || attachedFiles.length >= MAX_FILES}
-                            className={`p-1 md:p-1.5 rounded-lg transition-all ${loading || attachedFiles.length >= MAX_FILES
-                                ? 'text-faint'
-                                : 'text-muted hover:text-primary active:scale-95'
-                                }`}
-                            title="Attach files (images, code, text)"
-                        >
-                            <Paperclip className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                            onClick={() => setEnableWebSearch(!enableWebSearch)}
-                            className={`p-1 md:p-1.5 rounded-lg transition-all ${enableWebSearch
-                                ? 'text-blue-400 bg-blue-500/10 border border-blue-500/30'
-                                : 'text-muted hover:text-primary active:scale-95'
-                                }`}
-                            title={enableWebSearch ? 'Web search ON' : 'Web search OFF'}
-                        >
-                            <Globe className="w-3.5 h-3.5" />
-                        </button>
-                        {attachedFiles.some(f => f.type.startsWith('image/')) && (
-                            <div className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px]">
-                                <Eye className="w-2.5 h-2.5" />
-                                <span>{attachedFiles.filter(f => f.type.startsWith('image/')).length}</span>
+                        {attachedFiles.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-2 px-2">
+                                {attachedFiles.map((f, i) => (
+                                    <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] text-foreground group">
+                                        {f.type.startsWith('image/') ? <Image className="w-3 h-3 text-primary shrink-0" /> : <FileCode className="w-3 h-3 text-primary shrink-0" />}
+                                        <span className="truncate max-w-[120px]">{f.name}</span>
+                                        <span className="text-muted text-[10px]">{formatFileSize(f.size)}</span>
+                                        <button onClick={() => removeAttachedFile(i)} className="p-0.5 rounded hover:bg-white/10 text-muted hover:text-foreground transition-colors opacity-0 group-hover:opacity-100">
+                                            <Trash2 className="w-2.5 h-2.5" />
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         )}
-                        <button
-                            onClick={handleEnhance}
-                            disabled={loading || !prompt.trim()}
-                            className={`hidden sm:block p-1 md:p-1.5 rounded-lg transition-all ${loading || !prompt.trim()
-                                ? 'text-faint'
-                                : 'text-muted hover:text-primary active:scale-95'
-                                }`}
-                            title="Enhance prompt"
-                        >
-                            <Sparkles className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                            onClick={loading ? handleStop : () => handleSend()}
-                            disabled={!loading && (!prompt.trim() && attachedFiles.length === 0)}
-                            className={`p-1 md:p-1.5 rounded-lg transition-all ${loading
-                                ? 'bg-red-500 text-white hover:bg-red-600 active:scale-95'
-                                : (!prompt.trim() && attachedFiles.length === 0)
-                                    ? 'text-faint bg-[hsl(var(--surface-sunk))]'
-                                    : 'bg-foreground text-background hover:opacity-90 active:scale-95'
-                                }`}
-                            title={loading ? 'Stop generation' : 'Send'}
-                        >
-                            {loading ? (
-                                <Square className="w-3.5 h-3.5 fill-white" />
-                            ) : (
-                                <Send className="w-3.5 h-3.5" />
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            multiple
+                            accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.txt,.md,.log,.csv,.mcfunction,.js,.jsx,.mjs,.ts,.tsx,.java,.kt,.kts,.py,.yml,.yaml,.json,.xml,.gradle,.properties,.toml,.sh,.cfg,.conf,.ini"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                        />
+                        <textarea
+                            value={prompt}
+                            onChange={(e) => setPrompt(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                            placeholder={execMode === 'chat' ? "Ask me anything..." : isConfig ? "Describe the plugin config you need..." : isDatapack ? "Describe the datapack you need..." : isScripting ? "Describe the commands you need..." : attachedFiles.length > 0 ? "Add a message about the uploaded files..." : "Describe what you want to build..."}
+                            className="neu-input w-full text-xs text-foreground rounded-2xl p-4 pr-20 outline-none transition-all resize-none h-20"
+                        />
+                        <div className="absolute right-3 bottom-3 flex items-center gap-1.5 z-20">
+                            {modelDropdown ? modelDropdown : (
+                                <ModelSelector selectedModel={model} onSelectModel={() => {}} />
                             )}
-                        </button>
-                    </div>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowExecModeDropdown(!showExecModeDropdown)}
+                                    className="rounded-full border border-white/10 bg-[hsl(var(--surface-sunk))] px-2.5 py-1 text-[11px] text-foreground/80 flex items-center gap-1 hover:bg-white/10 hover:text-foreground transition-all font-semibold"
+                                    title="Execution mode"
+                                >
+                                    <span className="capitalize">{execMode === 'build' ? 'Build' : execMode === 'plan' ? 'Plan' : 'Chat'}</span>
+                                    <ChevronDown className="w-3 h-3 text-muted" />
+                                </button>
+                                {showExecModeDropdown && (
+                                    <div className="absolute bottom-full right-0 mb-2 w-36 rounded-xl border border-[hsl(var(--surface-sunk))] bg-[hsl(var(--surface))] p-1.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setExecMode('build'); setChatMode(false); setShowExecModeDropdown(false); }}
+                                            className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between ${execMode === 'build' ? 'bg-primary/10 text-primary font-bold' : 'text-foreground/80 hover:bg-[hsl(var(--surface-sunk))]'}`}
+                                        >
+                                            <span>Build Mode</span>
+                                            {execMode === 'build' && <Check className="w-3.5 h-3.5 text-primary" />}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setExecMode('plan'); setChatMode(false); setShowExecModeDropdown(false); }}
+                                            className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between ${execMode === 'plan' ? 'bg-purple-500/10 text-purple-400 font-bold' : 'text-foreground/80 hover:bg-[hsl(var(--surface-sunk))]'}`}
+                                        >
+                                            <span>Plan Mode</span>
+                                            {execMode === 'plan' && <Check className="w-3.5 h-3.5 text-purple-400" />}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setExecMode('chat'); setChatMode(true); setShowExecModeDropdown(false); }}
+                                            className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between ${execMode === 'chat' ? 'bg-emerald-500/10 text-emerald-400 font-bold' : 'text-foreground/80 hover:bg-[hsl(var(--surface-sunk))]'}`}
+                                        >
+                                            <span>Chat Mode</span>
+                                            {execMode === 'chat' && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={loading || attachedFiles.length >= MAX_FILES}
+                                className={`p-1.5 rounded-lg transition-all ${loading || attachedFiles.length >= MAX_FILES ? 'text-faint' : 'text-muted hover:text-primary active:scale-95'}`}
+                                title="Attach files (images, code, text)"
+                            >
+                                <Paperclip className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={() => setEnableWebSearch(!enableWebSearch)}
+                                className={`p-1.5 rounded-lg transition-all ${enableWebSearch ? 'text-blue-400 bg-blue-500/10 border border-blue-500/30' : 'text-muted hover:text-primary active:scale-95'}`}
+                                title={enableWebSearch ? 'Web search ON' : 'Web search OFF'}
+                            >
+                                <Globe className="w-3.5 h-3.5" />
+                            </button>
+                            {attachedFiles.some(f => f.type.startsWith('image/')) && (
+                                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px]">
+                                    <Eye className="w-2.5 h-2.5" />
+                                    <span>{attachedFiles.filter(f => f.type.startsWith('image/')).length}</span>
+                                </div>
+                            )}
+                            <button
+                                onClick={handleEnhance}
+                                disabled={loading || !prompt.trim()}
+                                className={`p-1.5 rounded-lg transition-all ${loading || !prompt.trim() ? 'text-faint' : 'text-muted hover:text-primary active:scale-95'}`}
+                                title="Enhance prompt"
+                            >
+                                <Sparkles className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={loading ? handleStop : () => handleSend()}
+                                disabled={!loading && (!prompt.trim() && attachedFiles.length === 0)}
+                                className={`p-1.5 rounded-lg transition-all ${loading
+                                    ? 'bg-red-500 text-white hover:bg-red-600 active:scale-95'
+                                    : (!prompt.trim() && attachedFiles.length === 0)
+                                        ? 'text-faint bg-[hsl(var(--surface-sunk))]'
+                                        : 'bg-foreground text-background hover:opacity-90 active:scale-95'
+                                    }`}
+                                title={loading ? 'Stop generation' : 'Send'}
+                            >
+                                {loading ? (
+                                    <Square className="w-3.5 h-3.5 fill-white" />
+                                ) : (
+                                    <Send className="w-3.5 h-3.5" />
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1566,9 +1479,54 @@ export const ChatPanel = ({
     );
 };
 
+const FileChipsSummary = ({ created, edited }: { created: string[]; edited: string[] }) => {
+    const total = created.length + edited.length;
+    if (total === 0) return null;
+
+    return (
+        <div data-file-chips className="mx-3 mt-2 rounded-lg border border-white/[.08] bg-[#10151b]/80 overflow-hidden animate-in fade-in duration-200">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-white/[.06]">
+                <div className="flex items-center gap-2">
+                    <FileCode className="w-3.5 h-3.5 text-zinc-400" />
+                    <span className="text-[11px] font-semibold text-zinc-300">Used {total} tool{total !== 1 ? 's' : ''}</span>
+                </div>
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        const el = e.currentTarget.closest('[data-file-chips]') as HTMLElement;
+                        if (el) el.style.display = 'none';
+                    }}
+                    className="p-1 rounded hover:bg-white/10 text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                    <X className="w-3.5 h-3.5" />
+                </button>
+            </div>
+            {created.length > 0 && (
+                <div className="px-3 py-2">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">Created</div>
+                    <div className="space-y-1">
+                        {created.map((path, idx) => (
+                            <FileBadge key={`c-${idx}`} path={path} />
+                        ))}
+                    </div>
+                </div>
+            )}
+            {edited.length > 0 && (
+                <div className={`px-3 py-2 ${created.length > 0 ? 'border-t border-white/[.06]' : ''}`}>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">Edited</div>
+                    <div className="space-y-1">
+                        {edited.map((path, idx) => (
+                            <FileBadge key={`e-${idx}`} path={path} edited />
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const AssistantMessageContent = ({ content }: { content: string }) => {
     if (!content) return null;
-
     const fileRegex = /`([^`]+\.(?:java|kt|xml|json|gradle|kts|yml|yaml|txt|properties|py|js|ts|rb))`|([\/\\]?[\w\-\.\/\\]+\.(?:java|kt|xml|json|gradle|kts|yml|yaml|txt|properties|py|js|ts|rb))/g;
     const paths = new Set<string>();
     let match;
@@ -1578,7 +1536,6 @@ const AssistantMessageContent = ({ content }: { content: string }) => {
             paths.add(path);
         }
     }
-
     if (paths.size === 0 && content.includes('```')) {
         return (
             <div className="flex items-center gap-2">
@@ -1587,10 +1544,8 @@ const AssistantMessageContent = ({ content }: { content: string }) => {
             </div>
         );
     }
-
     if (paths.size === 0) {
         return <span className="text-foreground/60">{content.length > 200 ? content.substring(0, 200) + '...' : content}</span>;
     }
-
     return null;
 };

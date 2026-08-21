@@ -96,8 +96,28 @@ export function ChatMessage({ id, role, content, created_at, messageType = 'mess
     </div>
   </div>;
 
-  const select = (value: string) => question && setAnswers(prev => ({ ...prev, [question.id]: value }));
-  const save = () => id && onSavePlan?.(id, answers);
+  const select = (value: string) => {
+    if (!question) return;
+    // Immediate state update for instant feedback
+    setAnswers(prev => ({ ...prev, [question.id]: value }));
+  };
+  const save = () => {
+    if (!id) return;
+    // Use requestAnimationFrame for smoother transition
+    requestAnimationFrame(() => {
+      onSavePlan?.(id, answers);
+    });
+  };
+  const goNext = () => {
+    if (index < (metadata.questions?.length || 1) - 1) {
+      setIndex(index + 1);
+    }
+  };
+  const goPrev = () => {
+    if (index > 0) {
+      setIndex(index - 1);
+    }
+  };
   return <div className="my-4 flex gap-2.5 px-5 animate-in fade-in slide-in-from-bottom-1 duration-200">
     <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-sky-400/20 bg-sky-400/10"><Sparkles className="h-3.5 w-3.5 text-sky-300" /></div>
     <div className="min-w-0 flex-1">
@@ -116,8 +136,15 @@ export function ChatMessage({ id, role, content, created_at, messageType = 'mess
 
       {messageType === 'plan' && question && status === 'awaiting_answers' && <div className="mt-3 rounded-lg border border-white/10 bg-[#11161d] p-3">
         <p className="mb-2 text-xs font-semibold text-zinc-100">{question.question}</p>
-        <div className="space-y-1.5">{question.options.map((option, i) => { const own = option.toLowerCase().startsWith('write your own'); const selected = answers[question.id] === option || (own && answers[question.id]?.startsWith('custom:')); return <div key={i}><button onClick={() => select(own ? `custom:${custom[question.id] || ''}` : option)} className={`flex w-full gap-2 rounded border p-2 text-left text-[11px] ${selected ? 'border-sky-400/50 bg-sky-400/10 text-zinc-100' : 'border-white/[.07] text-zinc-400 hover:bg-white/[.03]'}`}><span className={`mt-0.5 h-3 w-3 rounded-full border ${selected ? 'border-sky-400 bg-sky-400' : 'border-zinc-600'}`} />{option}</button>{own && selected && <input value={custom[question.id] || ''} onChange={e => { setCustom(prev => ({ ...prev, [question.id]: e.target.value })); select(`custom:${e.target.value}`); }} className="mt-1.5 w-full rounded border border-white/10 bg-black/20 px-2 py-1.5 text-xs outline-none" placeholder="Write your requirements..." />}</div>; })}</div>
-        <div className="mt-3 flex items-center justify-between"><div className="flex items-center gap-1 text-[10px] text-zinc-500"><button disabled={!index} onClick={() => setIndex(index - 1)}><ChevronLeft className="h-4 w-4" /></button>{index + 1}/{metadata.questions?.length}<button disabled={index === (metadata.questions?.length || 1) - 1} onClick={() => setIndex(index + 1)}><ChevronRight className="h-4 w-4" /></button></div><button onClick={save} className="rounded bg-sky-500 px-2.5 py-1.5 text-[10px] font-semibold text-black">{index < (metadata.questions?.length || 1) - 1 ? 'Save answers' : 'Review plan'}</button></div>
+        <div className="space-y-1.5">{question.options.map((option, i) => { const own = option.toLowerCase().startsWith('write your own'); const selected = answers[question.id] === option || (own && answers[question.id]?.startsWith('custom:')); return <div key={i}><button onClick={() => select(own ? `custom:${custom[question.id] || ''}` : option)} className={`flex w-full gap-2 rounded border p-2 text-left text-[11px] transition-all duration-75 ${selected ? 'border-sky-400/50 bg-sky-400/10 text-zinc-100' : 'border-white/[.07] text-zinc-400 hover:bg-white/[.03]'}`}><span className={`mt-0.5 h-3 w-3 rounded-full border transition-all duration-75 ${selected ? 'border-sky-400 bg-sky-400' : 'border-zinc-600'}`} />{option}</button>{own && selected && <input value={custom[question.id] || ''} onChange={e => { setCustom(prev => ({ ...prev, [question.id]: e.target.value })); select(`custom:${e.target.value}`); }} className="mt-1.5 w-full rounded border border-white/10 bg-black/20 px-2 py-1.5 text-xs outline-none" placeholder="Write your requirements..." />}</div>; })}</div>
+        <div className="mt-3 flex items-center justify-between">
+          <div className="flex items-center gap-1 text-[10px] text-zinc-500">
+            <button disabled={!index} onClick={goPrev} className="p-1 hover:bg-white/5 rounded transition-colors"><ChevronLeft className="h-4 w-4" /></button>
+            <span className="px-1">{index + 1}/{metadata.questions?.length}</span>
+            <button disabled={index === (metadata.questions?.length || 1) - 1} onClick={goNext} className="p-1 hover:bg-white/5 rounded transition-colors"><ChevronRight className="h-4 w-4" /></button>
+          </div>
+          <button onClick={save} className="rounded bg-sky-500 px-2.5 py-1.5 text-[10px] font-semibold text-black hover:bg-sky-400 transition-colors">{index < (metadata.questions?.length || 1) - 1 ? 'Save answers' : 'Review plan'}</button>
+        </div>
       </div>}
       {messageType === 'plan' && status === 'awaiting_approval' && <button onClick={() => id && onApprovePlan?.(id)} className="mt-3 flex items-center gap-1.5 rounded bg-sky-500 px-3 py-1.5 text-[11px] font-bold text-black"><Check className="h-3.5 w-3.5" />Approve & build</button>}
       {messageType === 'plan' && status === 'approved' && <span className="mt-3 flex items-center gap-1.5 text-[11px] text-sky-300"><Loader2 className="h-3.5 w-3.5 animate-spin" />Building approved plan...</span>}
