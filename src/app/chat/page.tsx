@@ -74,8 +74,8 @@ function ChatContent() {
     }, []);
 
     useEffect(() => {
-        if (view === 'projects') fetchProjects();
-    }, [view]);
+        if (view === 'projects' && user) fetchProjects();
+    }, [view, user]);
 
     // Close model dropdown on outside click
     useEffect(() => {

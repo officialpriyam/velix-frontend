@@ -732,7 +732,8 @@ export const ChatPanel = ({
                     logs.push({ message: `Reading ${docCount > 0 ? docCount + ' doc' + (docCount === 1 ? '' : 's') : 'project documentation'}...`, type: 'done' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'model') {
-                    logs.push({ message: `Generating with ${ev.model}...`, type: 'pending' });
+                    const modelLabel = ev.model || 'AI';
+                    logs.push({ message: `Generating with ${modelLabel}...`, type: 'pending' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'file') {
                     streamedFiles = true;
