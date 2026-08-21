@@ -819,6 +819,29 @@ export const ChatPanel = ({
                     }))
                 : [];
 
+            const onProgress = (ev: { event?: string; type?: string; query?: string; title?: string; url?: string; path?: string; op?: string; model?: string; docs?: string[]; command?: string; status?: string; output?: string; success?: boolean; content?: string }) => {
+                const evType = ev.event || ev.type || '';
+                if (evType === 'model' && ev.model) {
+                    setStatusLog(prev => [...prev, { message: `Using model: ${ev.model}`, type: 'done' }]);
+                } else if (evType === 'searching' && ev.query) {
+                    setStatusLog(prev => [...prev, { message: `Searching: ${ev.query}`, type: 'pending' }]);
+                } else if (evType === 'search' && ev.title) {
+                    setStatusLog(prev => [...prev, { message: `Found: ${ev.title}`, type: 'done' }]);
+                } else if (evType === 'docs' && ev.docs && ev.docs.length > 0) {
+                    setStatusLog(prev => [...prev, { message: `Read ${ev.docs!.length} doc(s)`, type: 'done' }]);
+                } else if (evType === 'file' && ev.path) {
+                    const isEdit = ev.op === 'edited';
+                    setGeneratedFiles(prev => {
+                        if (isEdit) return { created: prev.created, edited: [...prev.edited, ev.path!] };
+                        return { created: [...prev.created, ev.path!], edited: prev.edited };
+                    });
+                    setStatusLog(prev => [...prev, { message: `${isEdit ? '~ Edited' : '+ Created'} ${ev.path}`, type: 'done' }]);
+                    setStepCount(s => s + 1);
+                } else if (evType === 'command' && ev.command) {
+                    setStatusLog(prev => [...prev, { message: `Run: ${ev.command}`, type: ev.status === 'error' ? 'error' : 'done' }]);
+                }
+            };
+
             result = await aiApi.generate(
                 optimizedPrompt, language, model, sessionId || undefined, platform, abortControllerRef.current?.signal,
                 enableWebSearch,
@@ -826,7 +849,8 @@ export const ChatPanel = ({
                 fileContextEntries.length > 0 ? fileContextEntries : undefined,
                 effectiveChatMode,
                 Boolean(approvedPlanId),
-                approvedPlanId
+                approvedPlanId,
+                onProgress
             );
         } catch (fetchErr: any) {
             if (fetchErr.name === 'AbortError') {
@@ -1192,19 +1216,77 @@ export const ChatPanel = ({
                     );
                 })}
 
-                {/* Loading state: Collapsible sections */}
+                {/* Loading state: Live streaming view */}
                 {loading && (
                     <div className="mx-3 space-y-2 animate-in fade-in duration-200">
-                        {/* Steps counter */}
-                        {stepCount > 0 && <StepsCounter count={stepCount} />}
+                        {/* Live status log - shows each step as it happens */}
+                        {statusLog.length > 0 && (
+                            <div className="rounded-lg border border-white/[.08] bg-[#10151b]/80 overflow-hidden">
+                                {/* Header */}
+                                <div className="flex items-center justify-between px-3 py-2 border-b border-white/[.06]">
+                                    <div className="flex items-center gap-2">
+                                        <Brain className="h-3.5 w-3.5 animate-pulse text-violet-300" />
+                                        <span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">AI reasoning</span>
+                                        {agentCount > 0 && (
+                                            <span className="px-1.5 py-0.5 text-[8px] font-bold bg-violet-500/20 text-violet-300 rounded-full border border-violet-500/30">
+                                                {agentCount} agent{agentCount !== 1 ? 's' : ''}
+                                            </span>
+                                        )}
+                                        <span className="text-[10px] text-zinc-500">Working...</span>
+                                    </div>
+                                    <span className="text-[10px] text-zinc-500 tabular-nums">{formatElapsed(elapsedSeconds)}</span>
+                                </div>
 
-                        {/* Running tool indicator */}
-                        {runningTool && (
-                            <RunningToolIndicator label={runningTool} elapsed={elapsedSeconds} />
+                                {/* Live log entries - each appears as it's added */}
+                                <div className="divide-y divide-white/[.04]">
+                                    {statusLog.map((log, i) => (
+                                        <div key={`${log.message}-${i}`} className="flex items-center gap-2 px-3 py-1.5 text-[11px]">
+                                            {log.type === 'done' ? (
+                                                <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                                            ) : log.type === 'error' ? (
+                                                <AlertCircle className="h-3 w-3 shrink-0 text-red-400" />
+                                            ) : (
+                                                <Loader2 className="h-3 w-3 shrink-0 animate-spin text-sky-400" />
+                                            )}
+                                            <span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-500' : 'text-zinc-300'}>
+                                                {log.message}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Live file creation - shows files as they appear */}
+                                {(generatedFiles.created.length > 0 || generatedFiles.edited.length > 0) && (
+                                    <div className="px-3 py-2 border-t border-white/[.06]">
+                                        <div className="text-[9px] font-semibold uppercase tracking-[.12em] text-zinc-500 mb-1.5">Files changed</div>
+                                        <div className="space-y-1">
+                                            {generatedFiles.created.map((path, i) => (
+                                                <div key={`c-${i}`} className="flex items-center gap-2 text-[10px] animate-in fade-in duration-150">
+                                                    <FileCode className="h-3 w-3 text-sky-300 shrink-0" />
+                                                    <span className="text-zinc-400 font-mono truncate">{path}</span>
+                                                    <span className="ml-auto text-emerald-400 shrink-0">CREATED</span>
+                                                </div>
+                                            ))}
+                                            {generatedFiles.edited.map((path, i) => (
+                                                <div key={`e-${i}`} className="flex items-center gap-2 text-[10px] animate-in fade-in duration-150">
+                                                    <FileCode className="h-3 w-3 text-sky-300 shrink-0" />
+                                                    <span className="text-zinc-400 font-mono truncate">{path}</span>
+                                                    <span className="ml-auto text-emerald-400 shrink-0">EDITED</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Running tool at bottom */}
+                                {runningTool && (
+                                    <RunningToolIndicator label={runningTool} elapsed={elapsedSeconds} />
+                                )}
+                            </div>
                         )}
 
-                        {/* Streaming indicator (when no specific tool) */}
-                        {!runningTool && statusLog.length > 0 && (
+                        {/* Streaming indicator when no logs yet */}
+                        {statusLog.length === 0 && (
                             <StreamingIndicator elapsed={elapsedSeconds} />
                         )}
                     </div>
