@@ -323,7 +323,11 @@ export const compilerApi = {
             credentials: 'include',
             body: JSON.stringify({ sessionId, language })
         });
-        return safeJson(res);
+        const data = await safeJson(res);
+        if (!res.ok) {
+            throw new Error(data.error || data.message || `Compiler returned ${res.status}`);
+        }
+        return data;
     },
     getHistory: async (sessionId: string) => {
         const res = await fetch(`${BASE_URL}/compiler/history/${sessionId}`, { credentials: 'include' });

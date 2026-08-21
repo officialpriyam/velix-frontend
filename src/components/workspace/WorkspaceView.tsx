@@ -426,7 +426,8 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
                 });
                 log = parts.join('\n');
             }
-            if (!log) log = isSuccess ? 'Build completed successfully.' : 'Build failed with errors.';
+            if (!log && result.error) log = result.error;
+            if (!log) log = isSuccess ? 'Build completed successfully.' : 'Build failed with no error output. Check that files exist and the compiler is configured.';
             setBuildResult({
                 success: isSuccess,
                 log,
@@ -437,13 +438,18 @@ export const WorkspaceView = ({ sessionId, initialLanguage: incomingLanguage, in
             loadCompileHistory(sessionId);
             showNotification(isSuccess ? 'Build completed.' : 'Build failed.', isSuccess ? 'success' : 'error');
         } catch (err: any) {
+            const msg = err.message || String(err);
+            let detailedLog = 'Error: ' + msg;
+            if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('ECONNREFUSED')) {
+                detailedLog = 'Cannot connect to compiler service. The sandbox service may be down.\n\nDetails: ' + msg;
+            }
             setBuildResult({
                 success: false,
-                log: 'Error: ' + err.message,
+                log: detailedLog,
                 compiler: compiler || selectedCompiler,
                 timestamp: new Date().toISOString()
             });
-            showNotification('Build failed.', 'error');
+            showNotification('Build failed: ' + msg, 'error');
         } finally {
             setCompiling(false);
         }
