@@ -154,6 +154,9 @@ export const ChatPanel = ({
     const [docsChecked, setDocsChecked] = useState(false);
     const [commandStatus, setCommandStatus] = useState<{ command: string; status: string; output?: string }[]>([]);
     const [downloadStatus, setDownloadStatus] = useState<{ url: string; path: string; success: boolean }[]>([]);
+    const [todos, setTodos] = useState<{ text: string; done: boolean }[]>([]);
+    const [stepsCount, setStepsCount] = useState(0);
+    const [elapsed, setElapsed] = useState(0);
     const abortControllerRef = useRef<AbortController | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -162,9 +165,6 @@ export const ChatPanel = ({
     const [reasoningPopupOpen, setReasoningPopupOpen] = useState(false);
     const autoSubmittedPromptRef = useRef<string | null>(null);
     const { user } = useAuth();
-    const [elapsed, setElapsed] = useState(0);
-    const [todos, setTodos] = useState<{ text: string; done: boolean }[]>([]);
-    const [stepsCount, setStepsCount] = useState(0);
     const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
@@ -202,6 +202,8 @@ export const ChatPanel = ({
     // File upload constants
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     const MAX_FILES = 5;
+
+    // ... rest of the file remains the same but with OpenCode-style JSX below
     const ACCEPTED_TYPES = {
         'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'],
         'text/*': ['.txt', '.md', '.log', '.csv', '.mcfunction'],
@@ -1165,16 +1167,16 @@ export const ChatPanel = ({
 {loading && (
     <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 space-y-1 px-3 py-1">
         {/* Running tool indicator with progress bar */}
-        <div className="flex items-center gap-2 py-2">
+        <div className="flex items-center gap-2.5 py-2">
             <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
-            <span className="text-[11px] font-medium text-zinc-300">
+            <span className="text-[12px] font-medium text-zinc-200">
                 {generatedFiles.created.length > 0 || generatedFiles.edited.length > 0 ? 'Writing response' : 'read_files'}
             </span>
-            <span className="text-[10px] text-zinc-500">Running tool</span>
-            <span className="ml-auto text-[10px] text-zinc-500 tabular-nums">{elapsed}s</span>
+            <span className="text-[10px] text-zinc-500">· streaming output</span>
+            <span className="ml-auto text-[11px] text-zinc-500 tabular-nums font-mono">{elapsed}s</span>
         </div>
-        <div className="h-1 w-full rounded-full bg-white/[.06] overflow-hidden">
-            <div className="h-full bg-emerald-500/60 rounded-full transition-all duration-1000" style={{ width: loading ? '90%' : '100%' }} />
+        <div className="h-[3px] w-full rounded-full bg-white/[.04] overflow-hidden">
+            <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: loading ? '90%' : '100%' }} />
         </div>
 
         {/* Live commentary from status log */}
@@ -1310,24 +1312,24 @@ export const ChatPanel = ({
             </div>
 
             {scrolledDown && statusLog.length > 0 && (
-                <button type="button" onClick={() => setReasoningPopupOpen(!reasoningPopupOpen)} className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-[#10151b]/95 px-3 py-1.5 text-[11px] text-zinc-300 shadow-lg backdrop-blur transition-colors hover:border-white/20">
+                <button type="button" onClick={() => setReasoningPopupOpen(!reasoningPopupOpen)} className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-2.5 rounded-full border border-white/[.08] bg-[#161b22]/95 px-3.5 py-2 text-[11px] text-zinc-300 shadow-2xl backdrop-blur-xl transition-colors hover:border-white/[.15]">
                     {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" /> : <Brain className="h-3.5 w-3.5 text-zinc-400" />}
-                    <span>{loading ? 'Working...' : 'Done'}</span>
+                    <span className="font-medium">{loading ? 'Working...' : 'Done'}</span>
                     <span className="text-[10px] text-zinc-500">{statusLog.length} step{statusLog.length === 1 ? '' : 's'}</span>
                     <ChevronDown className={`h-3 w-3 text-zinc-500 transition-transform ${reasoningPopupOpen ? 'rotate-180' : ''}`} />
                 </button>
             )}
 
             {reasoningPopupOpen && statusLog.length > 0 && (
-                <div className="absolute left-1/2 top-16 z-20 -translate-x-1/2 w-full max-w-sm rounded-xl border border-white/[.08] bg-[#10151b] shadow-2xl overflow-hidden">
-                    <div className="flex items-center justify-between border-b border-white/[.06] px-3 py-2">
+                <div className="absolute left-1/2 top-16 z-20 -translate-x-1/2 w-full max-w-sm rounded-xl border border-white/[.08] bg-[#161b22] shadow-2xl overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-white/[.06] px-3 py-2.5">
                         <span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">Steps</span>
                         <button type="button" onClick={() => setReasoningPopupOpen(false)} className="rounded p-1 text-zinc-500 hover:text-zinc-300"><X className="h-3 w-3" /></button>
                     </div>
                     <div className="max-h-[40vh] overflow-y-auto divide-y divide-white/[.05]">
                         {statusLog.map((log, i) => (
-                            <div key={i} className="flex items-center gap-2 px-3 py-1.5">
-                                {log.type === 'done' ? <Check className="h-3 w-3 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3 w-3 shrink-0 text-red-400" /> : <Loader2 className="h-3 w-3 shrink-0 animate-spin text-sky-400" />}
+                            <div key={i} className="flex items-center gap-2.5 px-3 py-2">
+                                {log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}
                                 <span className={`text-[11px] ${log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}`}>{log.message}</span>
                             </div>
                         ))}
@@ -1335,41 +1337,41 @@ export const ChatPanel = ({
                 </div>
             )}
 
-            {/* To-dos checklist — sticky above input */}
+            {/* To-dos checklist — Freebuff-style sticky panel */}
             {todos.length > 0 && (
-                <div className="mx-1 mb-1 rounded-xl border border-white/[.08] bg-[#10151b] overflow-hidden">
-                    <div className="flex items-center gap-2 px-3 py-2">
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-3.5 h-3.5 rounded border border-zinc-600 flex items-center justify-center">
-                                <span className="text-[8px] text-zinc-400 font-mono">{todos.filter(t => t.done).length}</span>
+                <div className="mx-1 mb-1.5 rounded-xl border border-white/[.06] bg-[#161b22] overflow-hidden">
+                    <div className="flex items-center gap-2.5 px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                                <span className="text-[9px] text-emerald-400 font-bold font-mono">{todos.filter(t => t.done).length}</span>
                             </div>
-                            <span className="text-[11px] font-semibold text-zinc-300">To-dos</span>
+                            <span className="text-[12px] font-semibold text-zinc-200">To-dos</span>
                             <span className="text-[10px] text-zinc-500">{todos.filter(t => t.done).length}/{todos.length}</span>
                         </div>
-                        <ChevronDown className="h-3 w-3 text-zinc-500 ml-auto" />
+                        <ChevronDown className="h-3.5 w-3.5 text-zinc-500 ml-auto" />
                     </div>
-                    <div className="divide-y divide-white/[.05] px-3 pb-2">
+                    <div className="divide-y divide-white/[.04] px-3 pb-2.5">
                         {todos.map((todo, i) => (
-                            <div key={i} className="flex items-center gap-2 py-1.5">
+                            <div key={i} className="flex items-center gap-2.5 py-2">
                                 {todo.done ? (
-                                    <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-                                        <Check className="h-2.5 w-2.5 text-emerald-400" />
+                                    <div className="w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                                        <Check className="h-3 w-3 text-emerald-400" />
                                     </div>
                                 ) : (
-                                    <div className="w-4 h-4 rounded-full border border-zinc-600 shrink-0" />
+                                    <div className="w-5 h-5 rounded-full border-2 border-zinc-600 shrink-0" />
                                 )}
-                                <span className={`text-[11px] ${todo.done ? 'text-zinc-500 line-through' : 'text-zinc-300'}`}>{todo.text}</span>
+                                <span className={`text-[12px] ${todo.done ? 'text-zinc-500 line-through' : 'text-zinc-300'}`}>{todo.text}</span>
                             </div>
                         ))}
                     </div>
                 </div>
             )}
 
-            {/* Message queued indicator */}
+            {/* Message queued indicator — Freebuff style */}
             {loading && (
-                <div className="mx-1 mb-1 flex items-center gap-2 rounded-xl border border-white/[.08] bg-[#10151b] px-3 py-2">
-                    <div className="w-3.5 h-3.5 rounded-full border border-zinc-600 flex items-center justify-center shrink-0">
-                        <div className="w-1 h-1 rounded-full bg-zinc-500 animate-pulse" />
+                <div className="mx-1 mb-1.5 flex items-center gap-2.5 rounded-xl border border-white/[.06] bg-[#161b22] px-3 py-2.5">
+                    <div className="w-4 h-4 rounded-full border-2 border-zinc-600 flex items-center justify-center shrink-0">
+                        <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-pulse" />
                     </div>
                     <span className="text-[11px] text-zinc-400">Message queued</span>
                 </div>
