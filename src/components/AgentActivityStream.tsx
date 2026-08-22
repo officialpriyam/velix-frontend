@@ -7,7 +7,7 @@ import {
     FileCode,
     FileEdit,
     FilePlus,
-    FileTrash,
+    FileX,
     Globe,
     TerminalSquare,
     Sparkles,
@@ -138,7 +138,7 @@ export function FileActionCard({
     const filename = parts.pop() || path;
     const dirPath = parts.length > 0 ? parts.join('/') + '/' : '';
 
-    const Icon = op === 'created' ? FilePlus : op === 'deleted' ? FileTrash : FileEdit;
+    const Icon = op === 'created' ? FilePlus : op === 'deleted' ? FileX : FileEdit;
     const badgeColor = op === 'created'
         ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
         : op === 'deleted'
