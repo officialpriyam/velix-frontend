@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Bot, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, FileCode, FileText, Globe, Loader2, Sparkles, TerminalSquare, Download, AlertCircle, Clock, FileEdit } from 'lucide-react';
-import { KodariToolCard } from './AgentActivityStream';
+import { KodariToolCard, WorkingTimerHeader } from './AgentActivityStream';
 
 export interface QuestionItem { id: string; question: string; options: string[]; }
 export interface PlanData { title: string; summary: string; components?: { name: string; desc: string }[]; designDirection?: string[]; }
@@ -136,10 +136,10 @@ export function ChatMessage({ id, role, content, created_at, messageType = 'mess
   const hasFiles = (metadata.files && metadata.files.length > 0) || (metadata.created && metadata.created.length > 0) || (metadata.edited && metadata.edited.length > 0);
 
   return <div className="my-3 animate-in fade-in slide-in-from-bottom-1 duration-200 px-5">
-    {/* "Worked X steps" collapsible — shown for build messages */}
-    {messageType === 'build' && stepsCount > 0 && <CollapsibleSection title={`Worked ${stepsCount} step${stepsCount === 1 ? '' : 's'}`} icon={Clock} defaultOpen={false}>
-      <div className="text-[11px] text-zinc-400">The agent completed {stepsCount} steps to generate your code.</div>
-    </CollapsibleSection>}
+    {/* Working timer header matching screenshot 2 */}
+    {role === 'assistant' && (
+      <WorkingTimerHeader isWorking={false} elapsedMs={(metadata.elapsed || 15) * 1000} assistantName="Blink" />
+    )}
 
     {/* Main response content */}
     <div className="my-1">

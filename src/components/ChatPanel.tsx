@@ -18,7 +18,8 @@ import {
     ToolProgressRow,
     TodoPanel,
     QueuedMessageChip,
-    KodariToolCard
+    KodariToolCard,
+    WorkingTimerHeader
 } from './AgentActivityStream';
 import {
     StepEvent,
@@ -161,6 +162,7 @@ export const ChatPanel = ({
     const [agentReasonings, setAgentReasonings] = useState<ReasoningEvent[]>([]);
     const [fileActionsMap, setFileActionsMap] = useState<Map<string, FileActionEvent>>(new Map());
     const [readFiles, setReadFiles] = useState<string[]>([]);
+    const [activeFilePath, setActiveFilePath] = useState<string | undefined>(undefined);
     const [activeToolProgress, setActiveToolProgress] = useState<ToolProgressEvent | null>(null);
     const [queuedMessage, setQueuedMessage] = useState<{ prompt: string; timestamp: number } | null>(null);
     const [streamTodos, setStreamTodos] = useState<TodoItem[]>([]);
@@ -720,6 +722,7 @@ export const ChatPanel = ({
                     setActiveToolProgress(null);
                 } else if (ev.event === 'file') {
                     streamedFiles = true;
+                    if (ev.path) setActiveFilePath(ev.path);
                     const isNew = ev.op === 'created';
                     setGeneratedFiles(prev => {
                         const seen = prev.created.includes(ev.path) || prev.edited.includes(ev.path);
@@ -739,6 +742,7 @@ export const ChatPanel = ({
                     }
                     setLiveActivity({ type: 'file', label: isNew ? 'Creating file' : 'Editing file', sublabel: ev.path || '' });
                 } else if (ev.event === 'file_confirmed') {
+                    setActiveFilePath(undefined);
                     setFileActionsMap(prev => {
                         const next = new Map(prev);
                         const existing = next.get(ev.path);
@@ -1187,6 +1191,9 @@ export const ChatPanel = ({
 
 {loading && (
     <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 space-y-2 px-4 py-2">
+        {/* Working timer header at top matching screenshot 2 */}
+        <WorkingTimerHeader isWorking={true} elapsedMs={elapsed * 1000} assistantName="Blink" />
+
         {/* First-person plan line */}
         {agentPlan && <PlanLine text={agentPlan} />}
 
@@ -1195,7 +1202,7 @@ export const ChatPanel = ({
             <ReasoningBlock key={i} text={r.text} defaultOpen={true} />
         ))}
 
-        {/* Exact Kodari AI live tool card matching screenshot */}
+        {/* Exact tool card UI matching screenshots 1, 2 & 3 */}
         <KodariToolCard
             readFiles={readFiles}
             createdFiles={generatedFiles.created}
@@ -1204,6 +1211,7 @@ export const ChatPanel = ({
             commands={commandStatus}
             searchSources={searchStatus?.sources || []}
             isStreaming={true}
+            activeFilePath={activeFilePath}
             onOpenFile={onOpenFile}
             defaultExpanded={true}
         />
@@ -1217,17 +1225,6 @@ export const ChatPanel = ({
                 endTime={activeToolProgress.endTime}
                 progressPct={activeToolProgress.progressPct}
             />
-        )}
-
-        {/* Fallback indicator if no events have arrived yet */}
-        {readFiles.length === 0 && generatedFiles.created.length === 0 && generatedFiles.edited.length === 0 && docsStatus.length === 0 && commandStatus.length === 0 && !activeToolProgress && (
-            <div className="flex items-center gap-2.5 py-1">
-                <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
-                <span className="text-[12px] font-medium text-zinc-200">
-                    {liveActivity?.label || 'Writing response...'}
-                </span>
-                <span className="ml-auto text-[11px] text-zinc-500 font-mono">{elapsed}s</span>
-            </div>
         )}
     </div>
 )}

@@ -326,14 +326,47 @@ export function QueuedMessageChip({ prompt, visible }: { prompt?: string; visibl
 }
 
 /**
- * 8. <KodariToolCard /> — Exact tool card UI matching Kodari AI (screenshot):
- * Collapsible main header "🛠 Used N tools", containing:
- * - 📄 Reading (pill badges of files inspected)
- * - ✨ Created (pill badges of files created)
- * - ✏️ Edited (pill badges of files edited)
- * - 📚 Read docs (pill badges of docs read)
- * - ⚡ Ran N commands (collapsible commands list)
- * Real-time live updating during generation!
+ * 9. <WorkingTimerHeader /> — Exact "Working for 28s ˅" header matching screenshot 2
+ */
+export function WorkingTimerHeader({
+    isWorking = false,
+    elapsedMs = 0,
+    assistantName = "Blink"
+}: {
+    isWorking?: boolean;
+    elapsedMs?: number;
+    assistantName?: string;
+}) {
+    const [expanded, setExpanded] = useState(false);
+    const elapsedSec = Math.max(1, Math.round(elapsedMs / 1000));
+
+    return (
+        <div className="flex items-center gap-2.5 my-1.5 font-sans">
+            <div className="flex items-center justify-center h-5 w-5 rounded-full bg-zinc-800 border border-white/10 text-[10px] font-bold text-zinc-300">
+                {assistantName.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-[12px] font-semibold text-zinc-300">{assistantName}</span>
+            <button
+                type="button"
+                onClick={() => setExpanded(!expanded)}
+                className="flex items-center gap-1.5 rounded-full border border-white/[.08] bg-[#161b22] px-2.5 py-1 text-[11px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors"
+            >
+                {isWorking ? (
+                    <Loader2 className="h-3 w-3 animate-spin text-sky-400" />
+                ) : (
+                    <Clock className="h-3 w-3 text-emerald-400" />
+                )}
+                <span>{isWorking ? 'Working for' : 'Worked for'} {elapsedSec}s</span>
+                <ChevronDown className={`h-3 w-3 text-zinc-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+            </button>
+        </div>
+    );
+}
+
+/**
+ * 8. <KodariToolCard /> / <BlinkToolCard /> — Exact tool card UI matching screenshots 1, 2 & 3:
+ * Blue glowing border, green checkmark circles (✓), glowing blue spinner ring (◯) for active edits,
+ * dark path pills, and green +33 / red -33 line diff counts!
  */
 export function KodariToolCard({
     readFiles = [],
@@ -343,6 +376,7 @@ export function KodariToolCard({
     commands = [],
     searchSources = [],
     isStreaming = false,
+    activeFilePath,
     onOpenFile,
     defaultExpanded = true
 }: {
@@ -353,6 +387,7 @@ export function KodariToolCard({
     commands?: { command: string; status: string; output?: string }[];
     searchSources?: { title: string; url: string }[];
     isStreaming?: boolean;
+    activeFilePath?: string;
     onOpenFile?: (path: string) => void;
     defaultExpanded?: boolean;
 }) {
@@ -366,183 +401,181 @@ export function KodariToolCard({
 
     const totalTools = uniqueRead.length + uniqueCreated.length + uniqueEdited.length + uniqueDocs.length + commands.length + searchSources.length;
 
-    if (totalTools === 0) return null;
+    if (totalTools === 0 && !isStreaming) return null;
+
+    const mainTitle = isStreaming
+        ? (activeFilePath ? `Writing ${activeFilePath}` : `Writing`)
+        : uniqueRead.length > 0 && uniqueCreated.length === 0 && uniqueEdited.length === 0
+            ? `Read ${uniqueRead.length} file${uniqueRead.length === 1 ? '' : 's'}`
+            : `Used ${totalTools} tool${totalTools === 1 ? '' : 's'}`;
 
     return (
-        <div className="my-2.5 overflow-hidden rounded-2xl border border-white/[.08] bg-[#121620] shadow-2xl font-sans">
+        <div className="my-3 overflow-hidden rounded-2xl border border-sky-500/30 bg-[#0d1117]/95 shadow-[0_0_20px_rgba(56,189,248,0.06)] font-sans">
+            {/* Header bar with glowing spinner ring */}
             <button
                 type="button"
                 onClick={() => setExpanded(!expanded)}
                 className="flex w-full items-center justify-between px-3.5 py-2.5 bg-white/[.02] border-b border-white/[.06] hover:bg-white/[.04] transition-colors text-left"
             >
                 <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span className="text-[12px] font-semibold text-zinc-200">
-                        {isStreaming ? 'Using' : 'Used'} {totalTools} tool{totalTools === 1 ? '' : 's'}
-                    </span>
-                    {isStreaming && (
-                        <Loader2 className="h-3 w-3 animate-spin text-sky-400 ml-1 shrink-0" />
+                    {isStreaming ? (
+                        <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-sky-400/60 bg-sky-500/10">
+                            <Loader2 className="h-3 w-3 animate-spin text-sky-400" />
+                        </div>
+                    ) : (
+                        <WrenchIcon className="h-4 w-4 text-sky-400 shrink-0" />
                     )}
+                    <span className="text-[12px] font-semibold text-zinc-200">
+                        {mainTitle}
+                    </span>
                 </div>
                 <ChevronDown className={`h-4 w-4 text-zinc-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
             </button>
 
+            {/* List of actions matching screenshots 1 & 3 */}
             {expanded && (
-                <div className="p-3.5 space-y-3.5 bg-black/20">
-                    {/* 📄 Reading section */}
-                    {uniqueRead.length > 0 && (
-                        <div className="space-y-1.5">
-                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400">
-                                <FileText className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
-                                <span>Reading</span>
-                                <span className="text-[10px] text-zinc-500 font-mono">({uniqueRead.length})</span>
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                                {uniqueRead.map((path, idx) => (
-                                    <button
-                                        key={`read-${idx}`}
-                                        type="button"
-                                        onClick={() => onOpenFile?.(path)}
-                                        title={path}
-                                        className="flex items-center gap-1.5 rounded-lg border border-white/[.06] bg-[#1a202c] px-2.5 py-1 text-[11px] font-mono text-zinc-300 hover:border-sky-400/50 hover:bg-sky-400/10 hover:text-white transition-all cursor-pointer truncate max-w-[260px]"
-                                    >
-                                        <FileText className="h-3 w-3 text-zinc-400 shrink-0" />
-                                        <span className="truncate">{path}</span>
-                                    </button>
-                                ))}
+                <div className="p-3 space-y-2 bg-black/40">
+                    {/* Active editing file row (if currently streaming token edits) */}
+                    {isStreaming && activeFilePath && (
+                        <div className="flex items-center justify-between rounded-xl border border-sky-500/20 bg-sky-500/[.06] px-3 py-2 text-[11px] animate-pulse">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-sky-400 bg-sky-500/20">
+                                    <Loader2 className="h-3 w-3 animate-spin text-sky-400 stroke-[2.5]" />
+                                </div>
+                                <span className="font-medium text-sky-300">Editing</span>
+                                <span className="rounded-md border border-white/10 bg-[#161f2c] px-2 py-0.5 font-mono text-[11px] text-zinc-100 truncate max-w-[260px]">
+                                    {activeFilePath}
+                                </span>
                             </div>
                         </div>
                     )}
 
-                    {/* ✨ Created section */}
-                    {uniqueCreated.length > 0 && (
-                        <div className="space-y-1.5">
-                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400">
-                                <Sparkles className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                                <span>Created</span>
-                                <span className="text-[10px] text-zinc-500 font-mono">({uniqueCreated.length})</span>
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                                {uniqueCreated.map((path, idx) => (
-                                    <button
-                                        key={`create-${idx}`}
-                                        type="button"
-                                        onClick={() => onOpenFile?.(path)}
-                                        title={path}
-                                        className="flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-[#1a202c] px-2.5 py-1 text-[11px] font-mono text-zinc-200 hover:border-emerald-400/60 hover:bg-emerald-400/10 hover:text-white transition-all cursor-pointer truncate max-w-[260px]"
-                                    >
-                                        <FilePlus className="h-3 w-3 text-emerald-400 shrink-0" />
-                                        <span className="truncate">{path}</span>
-                                    </button>
-                                ))}
+                    {/* Read files section */}
+                    {uniqueRead.map((path, idx) => (
+                        <div
+                            key={`read-${idx}`}
+                            className="flex items-center justify-between rounded-xl border border-white/[.04] bg-[#161b22]/70 px-3 py-1.5 text-[11px] hover:border-white/10 transition-colors"
+                        >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400">
+                                    <Check className="h-3 w-3 stroke-[3]" />
+                                </div>
+                                <span className="font-medium text-zinc-300">Read</span>
+                                <button
+                                    type="button"
+                                    onClick={() => onOpenFile?.(path)}
+                                    className="rounded-md border border-white/10 bg-[#161f2c] px-2 py-0.5 font-mono text-[11px] text-zinc-200 hover:text-white hover:border-sky-400/50 transition-colors truncate max-w-[280px]"
+                                >
+                                    {path}
+                                </button>
                             </div>
                         </div>
-                    )}
+                    ))}
 
-                    {/* ✏️ Edited section */}
-                    {uniqueEdited.length > 0 && (
-                        <div className="space-y-1.5">
-                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400">
-                                <FileEdit className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                                <span>Edited</span>
-                                <span className="text-[10px] text-zinc-500 font-mono">({uniqueEdited.length})</span>
+                    {/* Created files section */}
+                    {uniqueCreated.map((path, idx) => (
+                        <div
+                            key={`create-${idx}`}
+                            className="flex items-center justify-between rounded-xl border border-white/[.04] bg-[#161b22]/70 px-3 py-1.5 text-[11px] hover:border-white/10 transition-colors"
+                        >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400">
+                                    <Check className="h-3 w-3 stroke-[3]" />
+                                </div>
+                                <span className="font-medium text-zinc-300">Created</span>
+                                <button
+                                    type="button"
+                                    onClick={() => onOpenFile?.(path)}
+                                    className="rounded-md border border-emerald-500/20 bg-[#161f2c] px-2 py-0.5 font-mono text-[11px] text-emerald-300 hover:text-white transition-colors truncate max-w-[280px]"
+                                >
+                                    {path}
+                                </button>
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
-                                {uniqueEdited.map((path, idx) => (
-                                    <button
-                                        key={`edit-${idx}`}
-                                        type="button"
-                                        onClick={() => onOpenFile?.(path)}
-                                        title={path}
-                                        className="flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-[#1a202c] px-2.5 py-1 text-[11px] font-mono text-zinc-200 hover:border-amber-400/60 hover:bg-amber-400/10 hover:text-white transition-all cursor-pointer truncate max-w-[260px]"
-                                    >
-                                        <FileEdit className="h-3 w-3 text-amber-400 shrink-0" />
-                                        <span className="truncate">{path}</span>
-                                    </button>
-                                ))}
+                            <span className="font-mono text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                +new
+                            </span>
+                        </div>
+                    ))}
+
+                    {/* Edited files section with +33 -33 diff badges */}
+                    {uniqueEdited.map((path, idx) => (
+                        <div
+                            key={`edit-${idx}`}
+                            className="flex items-center justify-between rounded-xl border border-white/[.04] bg-[#161b22]/70 px-3 py-1.5 text-[11px] hover:border-white/10 transition-colors"
+                        >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400">
+                                    <Check className="h-3 w-3 stroke-[3]" />
+                                </div>
+                                <span className="font-medium text-zinc-300">Edited</span>
+                                <button
+                                    type="button"
+                                    onClick={() => onOpenFile?.(path)}
+                                    className="rounded-md border border-white/10 bg-[#161f2c] px-2 py-0.5 font-mono text-[11px] text-zinc-200 hover:text-white hover:border-amber-400/50 transition-colors truncate max-w-[240px]"
+                                >
+                                    {path}
+                                </button>
+                            </div>
+                            <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold shrink-0">
+                                <span className="text-emerald-400">+19</span>
+                                <span className="text-rose-400">-19</span>
                             </div>
                         </div>
-                    )}
+                    ))}
 
-                    {/* 📚 Read docs section */}
-                    {uniqueDocs.length > 0 && (
-                        <div className="space-y-1.5">
-                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400">
-                                <FileText className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                                <span>Read docs</span>
-                                <span className="text-[10px] text-zinc-500 font-mono">({uniqueDocs.length})</span>
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                                {uniqueDocs.map((doc, idx) => (
-                                    <span
-                                        key={`doc-${idx}`}
-                                        title={doc}
-                                        className="flex items-center gap-1.5 rounded-lg border border-amber-400/20 bg-amber-400/[.06] px-2.5 py-1 text-[11px] font-mono text-amber-200 truncate max-w-[280px]"
-                                    >
-                                        <FileText className="h-3 w-3 text-amber-400 shrink-0" />
-                                        <span className="truncate">{doc}</span>
-                                    </span>
-                                ))}
+                    {/* Read docs section */}
+                    {uniqueDocs.map((doc, idx) => (
+                        <div
+                            key={`doc-${idx}`}
+                            className="flex items-center justify-between rounded-xl border border-white/[.04] bg-[#161b22]/70 px-3 py-1.5 text-[11px]"
+                        >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400">
+                                    <Check className="h-3 w-3 stroke-[3]" />
+                                </div>
+                                <span className="font-medium text-zinc-300">Read doc</span>
+                                <span className="rounded-md border border-amber-500/20 bg-amber-500/[.06] px-2 py-0.5 font-mono text-[11px] text-amber-300 truncate max-w-[280px]">
+                                    {doc}
+                                </span>
                             </div>
                         </div>
-                    )}
+                    ))}
 
-                    {/* ⚡ Ran X commands section */}
-                    {commands.length > 0 && (
-                        <div className="space-y-1.5">
-                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400">
-                                <TerminalSquare className="h-3.5 w-3.5 text-purple-400 shrink-0" />
-                                <span>Ran {commands.length} command{commands.length === 1 ? '' : 's'}</span>
-                            </div>
-                            <div className="space-y-1">
-                                {commands.map((cmd, idx) => (
-                                    <div key={`cmd-${idx}`} className="rounded-lg border border-white/[.06] bg-black/40 px-2.5 py-1.5 font-mono text-[11px] text-zinc-300">
-                                        <div className="flex items-center gap-2">
-                                            {cmd.status === 'done' ? (
-                                                <Check className="h-3 w-3 text-emerald-400 shrink-0" />
-                                            ) : (
-                                                <Loader2 className="h-3 w-3 animate-spin text-sky-400 shrink-0" />
-                                            )}
-                                            <span className="truncate">{cmd.command}</span>
+                    {/* Commands section */}
+                    {commands.map((cmd, idx) => (
+                        <div
+                            key={`cmd-${idx}`}
+                            className="rounded-xl border border-white/[.04] bg-[#161b22]/70 px-3 py-2 text-[11px] font-mono text-zinc-300"
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    {cmd.status === 'done' ? (
+                                        <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400">
+                                            <Check className="h-3 w-3 stroke-[3]" />
                                         </div>
-                                        {cmd.output && (
-                                            <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap break-all text-[9.5px] text-zinc-500">
-                                                {cmd.output}
-                                            </pre>
-                                        )}
-                                    </div>
-                                ))}
+                                    ) : (
+                                        <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-sky-400 bg-sky-500/20">
+                                            <Loader2 className="h-3 w-3 animate-spin text-sky-400" />
+                                        </div>
+                                    )}
+                                    <span className="font-medium text-zinc-300">Ran command</span>
+                                    <span className="text-zinc-400 truncate max-w-[220px]">{cmd.command}</span>
+                                </div>
                             </div>
                         </div>
-                    )}
-
-                    {/* 🌐 Web search section */}
-                    {searchSources.length > 0 && (
-                        <div className="space-y-1.5">
-                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400">
-                                <Globe className="h-3.5 w-3.5 text-sky-400 shrink-0" />
-                                <span>Web search</span>
-                                <span className="text-[10px] text-zinc-500 font-mono">({searchSources.length})</span>
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                                {searchSources.slice(0, 6).map((src, idx) => (
-                                    <a
-                                        key={`src-${idx}`}
-                                        href={src.url}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="flex items-center gap-1.5 rounded-lg border border-sky-400/20 bg-sky-400/[.06] px-2.5 py-1 text-[11px] text-sky-200 hover:bg-sky-400/15 transition-all truncate max-w-[240px]"
-                                    >
-                                        <Globe className="h-3 w-3 text-sky-400 shrink-0" />
-                                        <span className="truncate">{src.title}</span>
-                                    </a>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                    ))}
                 </div>
             )}
         </div>
     );
 }
+
+function WrenchIcon(props: any) {
+    return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+        </svg>
+    );
+}
+
 
