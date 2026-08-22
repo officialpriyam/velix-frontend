@@ -1,7 +1,7 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { ChatMessage, FilesChangedBox, SearchBox, DocsBox, CommandsBox, DownloadsBox } from './ChatMessage';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { ChatMessage } from './ChatMessage';
 import { ModelSelector } from './ModelSelector';
 import { Send, Sparkles, User, Bot, FileCode, Check, AlertCircle, Loader2, Copy, Hammer, X, FileText, File, FileCog, Download, CreditCard, Paperclip, Image, Trash2, Square, Globe, Brain, Eye, ChevronDown, TerminalSquare } from 'lucide-react';
 import { aiApi, copyToClipboard } from '../lib/api';
@@ -162,6 +162,10 @@ export const ChatPanel = ({
     const [reasoningPopupOpen, setReasoningPopupOpen] = useState(false);
     const autoSubmittedPromptRef = useRef<string | null>(null);
     const { user } = useAuth();
+    const [elapsed, setElapsed] = useState(0);
+    const [todos, setTodos] = useState<{ text: string; done: boolean }[]>([]);
+    const [stepsCount, setStepsCount] = useState(0);
+    const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
         const el = scrollRef.current;
@@ -174,6 +178,17 @@ export const ChatPanel = ({
         el.addEventListener('scroll', onScroll, { passive: true });
         return () => el.removeEventListener('scroll', onScroll);
     }, []);
+
+    useEffect(() => {
+        if (loading) {
+            setElapsed(0);
+            elapsedRef.current = setInterval(() => setElapsed(p => p + 1), 1000);
+        } else {
+            if (elapsedRef.current) clearInterval(elapsedRef.current);
+            elapsedRef.current = null;
+        }
+        return () => { if (elapsedRef.current) clearInterval(elapsedRef.current); };
+    }, [loading]);
 
     const statusLogKey = sessionId ? `velix_status_log_${sessionId}` : '';
     const generatedFilesKey = sessionId ? `velix_generated_files_${sessionId}` : '';
@@ -440,17 +455,18 @@ export const ChatPanel = ({
         const userMsg = messageOverride || prompt.trim();
         if ((!userMsg && attachedFiles.length === 0) || loading) return;
 
+        // Compact mode just redirects to IDE — no credits check needed
+        if (compact && onPromptSubmit) {
+            onPromptSubmit(userMsg);
+            return;
+        }
+
         // Check credits before generating
         const credits = user?.credits ?? 0;
         if (credits < 20) {
             setStatusLog([{ message: `Out of credits. You have ${credits} credits. 20 credits required to generate.`, type: 'error' }]);
             showNotification(`Out of credits! You have ${credits}. Buy more credits to continue generating.`, 'error');
             setLoading(false);
-            return;
-        }
-
-        if (compact && onPromptSubmit) {
-            onPromptSubmit(userMsg);
             return;
         }
 
@@ -710,7 +726,13 @@ export const ChatPanel = ({
             // Live progress updates streamed from the backend via SSE
             let searchQuery = '';
             const onProgress = (ev: any) => {
-                if (ev.event === 'searching') {
+                setStepsCount(prev => prev + 1);
+                if (ev.event === 'todos' && ev.todos) {
+                    const incoming = Array.isArray(ev.todos) ? ev.todos : [];
+                    setTodos(incoming.map((t: string) => ({ text: t, done: false })));
+                } else if (ev.event === 'todo_done' && ev.index !== undefined) {
+                    setTodos(prev => prev.map((t, i) => i === ev.index ? { ...t, done: true } : t));
+                } else if (ev.event === 'searching') {
                     searchQuery = ev.query || searchQuery;
                     logs.push({ message: 'Searching the web...', type: 'pending' });
                     setStatusLog([...logs]);
@@ -1078,50 +1100,6 @@ export const ChatPanel = ({
                 <button onClick={async () => { if (sessionId && await showConfirm({ title: 'Clear conversation', message: 'Clear this project conversation? This cannot be undone.', danger: true })) { const result = await aiApi.clearMessages(sessionId); if (!result.error) { setMessages([]); setPlanningData(null); } } }} className="rounded-lg px-2 py-1 text-[10px] text-zinc-500 hover:text-red-300">Clear</button>
             </div>
 
-            {/* Floating AI Reasoning Bar */}
-            {loading && statusLog.length > 0 && (
-                <div className="relative mx-3 mt-2 mb-1 rounded-lg overflow-hidden z-20">
-                    {/* Animated multi-color border */}
-                    <div className="absolute inset-0 rounded-lg pointer-events-none">
-                        <div className="absolute inset-0 rounded-lg opacity-75" style={{
-                            padding: '1px',
-                            background: 'linear-gradient(90deg, #ff0080, #ff8c00, #40e0d0, #7b68ee, #ff0080)',
-                            backgroundSize: '300% 100%',
-                            animation: 'rainbow 3s linear infinite',
-                            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                            WebkitMaskComposite: 'xor',
-                            maskComposite: 'exclude',
-                        }} />
-                    </div>
-                    <style>{`
-                        @keyframes rainbow {
-                            0% { background-position: 0% 50%; }
-                            100% { background-position: 300% 50%; }
-                        }
-                    `}</style>
-                    <div className="relative z-10 bg-[#10151b] px-3 py-2">
-                        <div className="flex items-center gap-2">
-                            <Brain className="h-3.5 w-3.5 animate-pulse text-violet-300" />
-                            <span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">AI reasoning</span>
-                            <span className="text-[9px] text-zinc-500">WorkingΓÇª</span>
-                            <Loader2 className="h-3 w-3 animate-spin text-sky-400 ml-auto" />
-                        </div>
-                        {statusLog.length > 0 && (
-                            <div className="mt-1.5 max-h-[40px] overflow-y-auto">
-                                {statusLog.slice(-2).map((log, i) => (
-                                    <div key={i} className="flex items-center gap-1.5 text-[9px]">
-                                        {log.type === 'done' ? <Check className="h-2.5 w-2.5 shrink-0 text-emerald-400" /> :
-                                         log.type === 'error' ? <AlertCircle className="h-2.5 w-2.5 shrink-0 text-red-400" /> :
-                                         <Loader2 className="h-2.5 w-2.5 shrink-0 animate-spin text-sky-400" />}
-                                        <span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-500' : 'text-zinc-400'}>{log.message}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
             <div ref={scrollRef} className="flex-1 overflow-y-auto mb-2 space-y-2">
                 {messages.length === 0 && statusLog.length === 0 && !buildResult && (
                     <div className="flex flex-col items-center justify-center h-full text-center px-4">
@@ -1185,12 +1163,49 @@ export const ChatPanel = ({
 })}
 
 {loading && (
-    <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
-        <FilesChangedBox files={undefined} created={generatedFiles.created} edited={generatedFiles.edited} onOpenFile={onOpenFile} />
-        <SearchBox search={searchStatus || undefined} />
-        <DocsBox docs={docsStatus} checked={docsChecked} />
-        <CommandsBox commands={commandStatus} />
-        <DownloadsBox downloads={downloadStatus} />
+    <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 space-y-1 px-3 py-1">
+        {/* Running tool indicator with progress bar */}
+        <div className="flex items-center gap-2 py-2">
+            <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+            <span className="text-[11px] font-medium text-zinc-300">
+                {generatedFiles.created.length > 0 || generatedFiles.edited.length > 0 ? 'Writing response' : 'read_files'}
+            </span>
+            <span className="text-[10px] text-zinc-500">Running tool</span>
+            <span className="ml-auto text-[10px] text-zinc-500 tabular-nums">{elapsed}s</span>
+        </div>
+        <div className="h-1 w-full rounded-full bg-white/[.06] overflow-hidden">
+            <div className="h-full bg-emerald-500/60 rounded-full transition-all duration-1000" style={{ width: loading ? '90%' : '100%' }} />
+        </div>
+
+        {/* Live commentary from status log */}
+        {statusLog.filter(l => l.type === 'done' && l.message).slice(-3).map((log, i) => (
+            <div key={i} className="flex items-center gap-2 py-0.5">
+                <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                <span className="text-[11px] text-zinc-400">{log.message}</span>
+            </div>
+        ))}
+
+        {/* Inline file badges */}
+        {[...generatedFiles.created.map(p => ({ path: p, edited: false })), ...generatedFiles.edited.map(p => ({ path: p, edited: true }))].map(({ path, edited }, i) => (
+            <button key={path + i} type="button" onClick={() => onOpenFile?.(path)} className="flex items-center gap-2 rounded-lg border border-white/[.06] bg-white/[.025] px-2.5 py-1.5 text-[11px] transition-colors hover:border-sky-400/40 hover:bg-sky-400/[.06] w-full">
+                <FileCode className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                <span className="text-zinc-300 truncate">{path}</span>
+                <span className="ml-auto text-[10px] text-zinc-500 shrink-0">{edited ? 'EDITED' : 'CREATED'}</span>
+                <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+            </button>
+        ))}
+
+        {/* Search sources inline */}
+        {searchStatus && searchStatus.sources.length > 0 && (
+            <div className="space-y-1">
+                {searchStatus.sources.slice(0, 3).map((s, i) => (
+                    <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[11px] text-sky-300 hover:text-sky-200 transition-colors truncate">
+                        <Globe className="h-3 w-3 shrink-0 text-sky-400" />
+                        <span className="truncate">{s.title}</span>
+                    </a>
+                ))}
+            </div>
+        )}
     </div>
 )}
 
@@ -1290,84 +1305,73 @@ export const ChatPanel = ({
                     </div>
                 )}
 
-                {false && statusLog.length > 0 && (
-                    <div className="px-3 py-2 space-y-1 animate-in fade-in duration-200">
-                        <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-1.5">
-                                <Loader2 className={`w-3 h-3 text-primary ${loading ? 'animate-spin' : ''}`} />
-                                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-                                    {loading ? 'Working...' : 'Done'}
-                                </span>
-                            </div>
-                            {!loading && (
-                                <button onClick={() => { setStatusLog([]); setGeneratedFiles({ created: [], edited: [] }); if (statusLogKey) try { localStorage.removeItem(statusLogKey); } catch {} if (generatedFilesKey) try { localStorage.removeItem(generatedFilesKey); } catch {} }} className="text-[10px] text-muted hover:text-foreground transition-colors px-1.5 py-0.5 rounded">
-                                    Clear
-                                </button>
-                            )}
-                        </div>
-                        {statusLog.map((log, i) => (
-                            <div key={i} className="flex items-center gap-2 py-0.5">
-                                <div className={`w-3 h-3 rounded-full flex items-center justify-center shrink-0 ${log.type === 'done' ? 'bg-green-500/15' :
-                                    log.type === 'error' ? 'bg-red-500/15' :
-                                        'bg-primary/10'
-                                    }`}>
-                                    {log.type === 'done' && <Check className="w-2 h-2 text-success" />}
-                                    {log.type === 'error' && <AlertCircle className="w-2 h-2 text-danger" />}
-                                    {log.type === 'pending' && (
-                                        <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
-                                    )}
-                                </div>
-                                <span className={`text-[11px] ${log.type === 'done' ? 'text-success/80' :
-                                    log.type === 'error' ? 'text-danger' :
-                                        'text-muted'
-                                    }`}>
-                                    {log.message}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                )}
 
                 <div ref={messagesEndRef} />
             </div>
 
             {scrolledDown && statusLog.length > 0 && (
-                <button type="button" onClick={() => setReasoningPopupOpen(true)} className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-violet-400/30 bg-[#10151b]/95 px-3 py-1.5 text-[11px] text-violet-200 shadow-[0_8px_24px_rgba(0,0,0,.4)] backdrop-blur transition-colors hover:border-violet-400/60">
-                    {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-300" /> : <Brain className="h-3.5 w-3.5 text-violet-300" />}
-                    <span>{loading ? 'AI workingΓÇª' : 'AI reasoning'}</span>
+                <button type="button" onClick={() => setReasoningPopupOpen(!reasoningPopupOpen)} className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-[#10151b]/95 px-3 py-1.5 text-[11px] text-zinc-300 shadow-lg backdrop-blur transition-colors hover:border-white/20">
+                    {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" /> : <Brain className="h-3.5 w-3.5 text-zinc-400" />}
+                    <span>{loading ? 'Working...' : 'Done'}</span>
                     <span className="text-[10px] text-zinc-500">{statusLog.length} step{statusLog.length === 1 ? '' : 's'}</span>
-                    <ChevronDown className="h-3 w-3 rotate-180 text-zinc-500" />
+                    <ChevronDown className={`h-3 w-3 text-zinc-500 transition-transform ${reasoningPopupOpen ? 'rotate-180' : ''}`} />
                 </button>
             )}
 
             {reasoningPopupOpen && statusLog.length > 0 && (
-                <div className="absolute inset-0 z-30 flex items-center justify-center p-6" onClick={() => setReasoningPopupOpen(false)}>
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-                    <div className="relative w-full max-w-md overflow-hidden rounded-xl bg-[#10151b] shadow-2xl" onClick={e => e.stopPropagation()}>
-                        {/* Animated multi-color border */}
-                        <div className="absolute inset-0 rounded-xl pointer-events-none">
-                            <div className="absolute inset-0 rounded-xl animate-[rainbow_3s_linear_infinite] opacity-75" style={{
-                                padding: '1px',
-                                background: 'linear-gradient(90deg, #ff0080, #ff8c00, #40e0d0, #7b68ee, #ff0080)',
-                                backgroundSize: '300% 100%',
-                                animation: 'rainbow 3s linear infinite',
-                                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                                WebkitMaskComposite: 'xor',
-                                maskComposite: 'exclude',
-                            }} />
-                        </div>
-                        <style>{`
-                            @keyframes rainbow {
-                                0% { background-position: 0% 50%; }
-                                100% { background-position: 300% 50%; }
-                            }
-                        `}</style>
-                        <div className="relative z-10 flex items-center justify-between border-b border-white/[.06] px-4 py-2.5">
-                            <span className="flex items-center gap-2"><Brain className={`h-4 w-4 ${loading ? 'animate-pulse text-violet-300' : 'text-sky-300'}`} /><span className="text-[11px] font-semibold uppercase tracking-[.12em] text-zinc-200">AI reasoning</span><span className="text-[10px] text-zinc-500">{loading ? 'WorkingΓÇª' : 'Complete'}</span></span>
-                            <button type="button" onClick={() => setReasoningPopupOpen(false)} className="rounded p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-200"><X className="h-4 w-4" /></button>
-                        </div>
-                        <div className="relative z-10 max-h-[60vh] divide-y divide-white/[.055] overflow-y-auto">{statusLog.map((log, i) => <div key={`pop-${log.message}-${i}`} className="flex items-center gap-2 px-4 py-2 text-[11px]">{log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}<span className={log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}>{log.message}</span></div>)}</div>
+                <div className="absolute left-1/2 top-16 z-20 -translate-x-1/2 w-full max-w-sm rounded-xl border border-white/[.08] bg-[#10151b] shadow-2xl overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-white/[.06] px-3 py-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">Steps</span>
+                        <button type="button" onClick={() => setReasoningPopupOpen(false)} className="rounded p-1 text-zinc-500 hover:text-zinc-300"><X className="h-3 w-3" /></button>
                     </div>
+                    <div className="max-h-[40vh] overflow-y-auto divide-y divide-white/[.05]">
+                        {statusLog.map((log, i) => (
+                            <div key={i} className="flex items-center gap-2 px-3 py-1.5">
+                                {log.type === 'done' ? <Check className="h-3 w-3 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3 w-3 shrink-0 text-red-400" /> : <Loader2 className="h-3 w-3 shrink-0 animate-spin text-sky-400" />}
+                                <span className={`text-[11px] ${log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}`}>{log.message}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* To-dos checklist — sticky above input */}
+            {todos.length > 0 && (
+                <div className="mx-1 mb-1 rounded-xl border border-white/[.08] bg-[#10151b] overflow-hidden">
+                    <div className="flex items-center gap-2 px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-3.5 h-3.5 rounded border border-zinc-600 flex items-center justify-center">
+                                <span className="text-[8px] text-zinc-400 font-mono">{todos.filter(t => t.done).length}</span>
+                            </div>
+                            <span className="text-[11px] font-semibold text-zinc-300">To-dos</span>
+                            <span className="text-[10px] text-zinc-500">{todos.filter(t => t.done).length}/{todos.length}</span>
+                        </div>
+                        <ChevronDown className="h-3 w-3 text-zinc-500 ml-auto" />
+                    </div>
+                    <div className="divide-y divide-white/[.05] px-3 pb-2">
+                        {todos.map((todo, i) => (
+                            <div key={i} className="flex items-center gap-2 py-1.5">
+                                {todo.done ? (
+                                    <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                                        <Check className="h-2.5 w-2.5 text-emerald-400" />
+                                    </div>
+                                ) : (
+                                    <div className="w-4 h-4 rounded-full border border-zinc-600 shrink-0" />
+                                )}
+                                <span className={`text-[11px] ${todo.done ? 'text-zinc-500 line-through' : 'text-zinc-300'}`}>{todo.text}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Message queued indicator */}
+            {loading && (
+                <div className="mx-1 mb-1 flex items-center gap-2 rounded-xl border border-white/[.08] bg-[#10151b] px-3 py-2">
+                    <div className="w-3.5 h-3.5 rounded-full border border-zinc-600 flex items-center justify-center shrink-0">
+                        <div className="w-1 h-1 rounded-full bg-zinc-500 animate-pulse" />
+                    </div>
+                    <span className="text-[11px] text-zinc-400">Message queued</span>
                 </div>
             )}
 
