@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ChatMessage } from './ChatMessage';
@@ -9,6 +9,23 @@ import { useNotification } from './Notification';
 import { showConfirm } from './ConfirmDialog';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
+
+import {
+    StepCounter,
+    PlanLine,
+    ReasoningBlock,
+    FileActionCard,
+    ToolProgressRow,
+    TodoPanel,
+    QueuedMessageChip
+} from './AgentActivityStream';
+import {
+    StepEvent,
+    ReasoningEvent,
+    FileActionEvent,
+    TodoItem,
+    ToolProgressEvent
+} from '../types/agentStreamTypes';
 
 interface Message {
     id?: number;
@@ -85,8 +102,8 @@ function getFileType(filename: string): string {
 function formatPlanMarkdown(plan: any, questions: any[] = []) {
     const lines = [`# ${plan?.title || 'Project Plan'}`, '', plan?.summary || ''];
     if (plan?.components?.length) {
-        lines.push('', '## What IΓÇÖll build', '');
-        plan.components.forEach((component: any) => lines.push(`- **${component.name}** ΓÇö ${component.desc}`));
+        lines.push('', '## What I’ll build', '');
+        plan.components.forEach((component: any) => lines.push(`- **${component.name}** — ${component.desc}`));
     }
     if (plan?.designDirection?.length) lines.push('', '## Design direction', '', ...plan.designDirection.map((item: string) => `- ${item}`));
     if (questions.length) lines.push('', '## Decisions to confirm', '', ...questions.map((question: any) => `- ${question.question}`));
@@ -137,6 +154,14 @@ export const ChatPanel = ({
     const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: string; content: string; size: number }[]>([]);
     const [enableWebSearch, setEnableWebSearch] = useState(false);
     const [chatMode, setChatMode] = useState(false);
+    // Structured Streaming State
+    const [agentSteps, setAgentSteps] = useState<StepEvent[]>([]);
+    const [agentPlan, setAgentPlan] = useState<string | null>(null);
+    const [agentReasonings, setAgentReasonings] = useState<ReasoningEvent[]>([]);
+    const [fileActionsMap, setFileActionsMap] = useState<Map<string, FileActionEvent>>(new Map());
+    const [activeToolProgress, setActiveToolProgress] = useState<ToolProgressEvent | null>(null);
+    const [queuedMessage, setQueuedMessage] = useState<{ prompt: string; timestamp: number } | null>(null);
+    const [streamTodos, setStreamTodos] = useState<TodoItem[]>([]);
   // Plan mode state
   const [planPrompt, setPlanPrompt] = useState('');
     const [execMode, setExecMode] = useState<'build' | 'plan' | 'chat'>('plan');
@@ -457,7 +482,17 @@ export const ChatPanel = ({
 
     const handleSend = async (messageOverride?: string, forceBuild?: boolean) => {
         const userMsg = messageOverride || prompt.trim();
-        if ((!userMsg && attachedFiles.length === 0) || loading) return;
+        if (!userMsg && attachedFiles.length === 0) return;
+
+        if (loading) {
+            if (sessionId && userMsg) {
+                setQueuedMessage({ prompt: userMsg, timestamp: Date.now() });
+                setPrompt('');
+                aiApi.queueMessage(sessionId, userMsg).catch(err => console.warn('Queue message failed:', err));
+                showNotification('Message queued', 'info');
+            }
+            return;
+        }
 
         // Compact mode just redirects to IDE — no credits check needed
         if (compact && onPromptSubmit) {
@@ -588,8 +623,15 @@ export const ChatPanel = ({
         setDocsStatus([]);
         setCommandStatus([]);
         setDownloadStatus([]);
+        setAgentSteps([]);
+        setAgentPlan(null);
+        setAgentReasonings([]);
+        setFileActionsMap(new Map());
+        setActiveToolProgress(null);
+        setQueuedMessage(null);
+        setStreamTodos([]);
 
-        // Local accumulators ΓÇö populated live by onProgress and baked into the
+        // Local accumulators — populated live by onProgress and baked into the
         // summary message metadata (React state would be stale in this closure).
         const localSearch: { queries: string[]; sources: { title: string; url: string }[] } = { queries: [], sources: [] };
         const localDocs: string[] = [];
@@ -627,7 +669,7 @@ export const ChatPanel = ({
         setStatusLog([
             { message: 'Analyzing request...', type: 'pending' }
         ]);
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 300));
 
         const logs: { message: string; type: 'pending' | 'done' | 'error' }[] = [
             { message: 'Analyzing request...', type: 'done' }
@@ -635,80 +677,10 @@ export const ChatPanel = ({
 
         let streamedFiles = false;
 
-        if (!effectiveChatMode) {
-            setStatusLog([...logs, { message: `Loading ${skillLabel} ${modeLabel.toLowerCase()} skills...`, type: 'pending' }]);
-            await new Promise(r => setTimeout(r, 400));
-
-            const skillDetails: Record<string, string[]> = {
-                minecraft: isConfig
-                    ? ['EssentialsX Ops', 'Server Admin', 'Config Generation']
-                    : isDatapack
-                        ? ['Datapack Dev', 'Commands/Scripting', 'World Generation']
-                        : isScripting
-                            ? ['Commands/Scripting', 'Scoreboard', 'Execute Chains']
-                            : ['Plugin Dev (Paper/Spigot)', 'Modding (NeoForge/Fabric)', 'Datapacks', 'Commands/Scripting'],
-                hytale: ['Plugin Basics', 'Custom Blocks', 'Custom Items', 'Custom Entities', 'Events API'],
-                discord: ['Bot Framework', 'Commands', 'Events']
-            };
-            const skills = skillDetails[platform] || [];
-
-            logs.push({ message: `Loading ${skillLabel} ${modeLabel.toLowerCase()} skills...`, type: 'done' });
-            for (const skill of skills.slice(0, 3)) {
-                logs.push({ message: `  ${skill}`, type: 'pending' });
-                setStatusLog([...logs]);
-                await new Promise(r => setTimeout(r, 200));
-                if (abortControllerRef.current?.signal.aborted) { setLoading(false); return; }
-                logs[logs.length - 1] = { message: `  ${skill}`, type: 'done' };
-                setStatusLog([...logs]);
-            }
-            if (skills.length > 3) {
-            logs.push({ message: `  +${skills.length - 3} more skills`, type: 'done' });
-            setStatusLog([...logs]);
-        }
-        } else {
-            // Chat mode: minimal status
-            setStatusLog([...logs, { message: 'Chat mode ΓÇö just talking, no code gen', type: 'done' }]);
-        }
-
         const hasImages = attachedFiles.some(f => f.type.startsWith('image/'));
         const fileContextCount = projectFiles ? Object.keys(projectFiles).filter(p => !p.startsWith('.')).length : 0;
 
-        if (!effectiveChatMode) {
-            if (hasImages) {
-                logs.push({ message: `Vision: ${attachedFiles.filter(f => f.type.startsWith('image/')).length} image(s) attached`, type: 'done' });
-                setStatusLog([...logs]);
-            }
-            if (enableWebSearch) {
-                logs.push({ message: 'Web search enabled', type: 'done' });
-                setStatusLog([...logs]);
-            }
-            if (fileContextCount > 0) {
-                logs.push({ message: `Project context: ${fileContextCount} file(s)`, type: 'done' });
-                setStatusLog([...logs]);
-            }
-        }
-
-        logs.push({ message: `Optimizing prompt...`, type: 'pending' });
-        setStatusLog([...logs]);
-
         let optimizedPrompt = finalPrompt;
-        try {
-            const enhanceResult = await aiApi.enhancePrompt(finalPrompt, platform, language, abortControllerRef.current?.signal);
-            if (enhanceResult.enhanced && enhanceResult.enhanced !== finalPrompt) {
-                optimizedPrompt = enhanceResult.enhanced;
-                logs[logs.length - 1] = { message: `Prompt optimized`, type: 'done' };
-            } else {
-                logs[logs.length - 1] = { message: `Prompt ready`, type: 'done' };
-            }
-        } catch (enhanceErr: any) {
-            if (enhanceErr.name === 'AbortError') { setLoading(false); return; }
-            logs[logs.length - 1] = { message: `Using original prompt`, type: 'done' };
-        }
-        setStatusLog([...logs]);
-
-        const genLabel = effectiveChatMode ? 'Thinking...' : isConfig ? 'Generating config...' : isDatapack ? 'Generating datapack...' : isScripting ? 'Generating commands...' : 'Generating code...';
-        logs.push({ message: genLabel, type: 'pending' });
-        setStatusLog([...logs]);
 
         let result: any;
         try {
@@ -731,12 +703,58 @@ export const ChatPanel = ({
             // Live progress updates streamed from the backend via SSE
             let searchQuery = '';
             const onProgress = (ev: any) => {
-                setStepsCount(prev => prev + 1);
-                if (ev.event === 'todos' && ev.todos) {
-                    const incoming = Array.isArray(ev.todos) ? ev.todos : [];
-                    setTodos(incoming.map((t: string) => ({ text: t, done: false })));
-                } else if (ev.event === 'todo_done' && ev.index !== undefined) {
-                    setTodos(prev => prev.map((t, i) => i === ev.index ? { ...t, done: true } : t));
+                if (ev.event === 'step_start') {
+                    setAgentSteps(prev => [...prev, { stepIndex: ev.stepIndex, label: ev.label || 'Step', startTime: ev.startTime || Date.now() }]);
+                    setStepsCount(prev => prev + 1);
+                } else if (ev.event === 'step_end') {
+                    setAgentSteps(prev => prev.map(s => s.stepIndex === ev.stepIndex ? { ...s, endTime: ev.endTime || Date.now() } : s));
+                } else if (ev.event === 'plan') {
+                    if (ev.text) setAgentPlan(ev.text);
+                } else if (ev.event === 'reasoning') {
+                    if (ev.text) setAgentReasonings(prev => [...prev, { text: ev.text, stepIndex: ev.stepIndex || 0 }]);
+                } else if (ev.event === 'tool_start') {
+                    setActiveToolProgress({ tool: ev.tool, label: ev.label || ev.tool, startTime: ev.startTime || Date.now() });
+                } else if (ev.event === 'tool_end') {
+                    setActiveToolProgress(null);
+                } else if (ev.event === 'file') {
+                    streamedFiles = true;
+                    const isNew = ev.op === 'created';
+                    setGeneratedFiles(prev => {
+                        const seen = prev.created.includes(ev.path) || prev.edited.includes(ev.path);
+                        if (seen) return prev;
+                        return {
+                            created: isNew ? [...prev.created, ev.path] : prev.created,
+                            edited: isNew ? prev.edited : [...prev.edited, ev.path]
+                        };
+                    });
+                    setFileActionsMap(prev => {
+                        const next = new Map(prev);
+                        next.set(ev.path, { path: ev.path, op: isNew ? 'created' : 'edited', status: 'writing', content: ev.content });
+                        return next;
+                    });
+                    if (ev.content && onFileStream) {
+                        onFileStream({ path: ev.path, content: ev.content });
+                    }
+                    setLiveActivity({ type: 'file', label: isNew ? 'Creating file' : 'Editing file', sublabel: ev.path || '' });
+                } else if (ev.event === 'file_confirmed') {
+                    setFileActionsMap(prev => {
+                        const next = new Map(prev);
+                        const existing = next.get(ev.path);
+                        next.set(ev.path, {
+                            path: ev.path,
+                            op: ev.op || existing?.op || 'edited',
+                            status: 'confirmed',
+                            content: existing?.content
+                        });
+                        return next;
+                    });
+                } else if (ev.event === 'todo_update') {
+                    if (Array.isArray(ev.items)) {
+                        setStreamTodos(ev.items);
+                        setTodos(ev.items.map((i: any) => ({ text: i.text, done: i.status === 'done' })));
+                    }
+                } else if (ev.event === 'message_queued') {
+                    setQueuedMessage({ prompt: ev.prompt, timestamp: ev.timestamp || Date.now() });
                 } else if (ev.event === 'searching') {
                     searchQuery = ev.query || searchQuery;
                     setLiveActivity({ type: 'search', label: 'Searching the web', sublabel: ev.query || '' });
@@ -765,23 +783,6 @@ export const ChatPanel = ({
                 } else if (ev.event === 'model') {
                     setLiveActivity({ type: 'generating', label: 'Generating code', sublabel: ev.model || '' });
                     logs.push({ message: `Generating with ${ev.model}...`, type: 'pending' });
-                    setStatusLog([...logs]);
-                } else if (ev.event === 'file') {
-                    streamedFiles = true;
-                    const isNew = ev.op === 'created';
-                    setGeneratedFiles(prev => {
-                        const seen = prev.created.includes(ev.path) || prev.edited.includes(ev.path);
-                        if (seen) return prev;
-                        return {
-                            created: isNew ? [...prev.created, ev.path] : prev.created,
-                            edited: isNew ? prev.edited : [...prev.edited, ev.path]
-                        };
-                    });
-                    if (ev.content && onFileStream) {
-                        onFileStream({ path: ev.path, content: ev.content });
-                    }
-                    setLiveActivity({ type: 'file', label: isNew ? 'Creating file' : 'Editing file', sublabel: ev.path || '' });
-                    logs.push({ message: `${isNew ? '+' : '~'} ${isNew ? 'Created' : 'Edited'} ${ev.path}`, type: 'done' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'command') {
                     if (ev.status === 'running') {
@@ -1178,68 +1179,48 @@ export const ChatPanel = ({
 })}
 
 {loading && (
-    <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 space-y-1.5 px-5 py-2">
-        {/* Freebuff-style live activity indicator */}
-        <div className="flex items-center gap-2.5">
-            <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
-            <div className="flex items-center gap-2 min-w-0">
-                {liveActivity?.type === 'file' && <FileCode className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
-                {liveActivity?.type === 'search' && <Globe className="h-3.5 w-3.5 shrink-0 text-sky-400" />}
-                {liveActivity?.type === 'docs' && <FileText className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
-                {liveActivity?.type === 'command' && <TerminalSquare className="h-3.5 w-3.5 shrink-0 text-violet-400" />}
-                {liveActivity?.type === 'generating' && <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-400" />}
-                {liveActivity?.type === 'thinking' && <Brain className="h-3.5 w-3.5 shrink-0 text-zinc-400" />}
-                {!liveActivity && <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-400" />}
-                <span className="text-[12px] font-medium text-zinc-200 truncate">
-                    {liveActivity?.label || (generatedFiles.created.length > 0 || generatedFiles.edited.length > 0 ? 'Writing response' : 'read_files')}
-                </span>
-                {liveActivity?.sublabel && <span className="text-[10px] text-zinc-500 truncate max-w-[180px]">· {liveActivity.sublabel}</span>}
-            </div>
-            <span className="ml-auto text-[11px] text-zinc-500 tabular-nums font-mono shrink-0">{elapsed}s</span>
-        </div>
-        <div className="h-[3px] w-full rounded-full bg-white/[.04] overflow-hidden">
-            <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: loading ? '90%' : '100%' }} />
-        </div>
+    <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 space-y-2 px-4 py-2">
+        {/* Step counter header */}
+        <StepCounter steps={agentSteps} expanded={true} />
 
-        {/* Live commentary from status log — show last completed steps */}
-        {statusLog.filter(l => l.type === 'done' && l.message).slice(-3).map((log, i) => (
-            <div key={i} className="flex items-center gap-2 py-0.5">
-                <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                <span className="text-[11px] text-zinc-400">{log.message}</span>
-            </div>
+        {/* First-person plan line */}
+        {agentPlan && <PlanLine text={agentPlan} />}
+
+        {/* Reasoning blocks */}
+        {agentReasonings.slice(-1).map((r, i) => (
+            <ReasoningBlock key={i} text={r.text} defaultOpen={true} />
         ))}
 
-        {/* Inline file badges — show all files created/edited so far */}
-        {[...generatedFiles.created.map(p => ({ path: p, edited: false })), ...generatedFiles.edited.map(p => ({ path: p, edited: true }))].map(({ path, edited }, i) => (
-            <button key={path + i} type="button" onClick={() => onOpenFile?.(path)} className="flex w-full items-center gap-2 rounded-lg border border-white/[.06] bg-white/[.025] px-2.5 py-1.5 text-[11px] transition-colors hover:border-sky-400/40 hover:bg-sky-400/[.06]">
-                <FileCode className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-                <span className="text-zinc-300 truncate font-mono">{path}</span>
-                <span className="ml-auto text-[9px] font-bold uppercase text-zinc-500 shrink-0">{edited ? 'EDITED' : 'CREATED'}</span>
-                <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-            </button>
-        ))}
-
-        {/* Search sources inline — show found web results */}
-        {searchStatus && searchStatus.sources.length > 0 && (
-            <div className="space-y-1">
-                {searchStatus.sources.slice(0, 3).map((s, i) => (
-                    <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[11px] text-sky-300 hover:text-sky-200 transition-colors truncate">
-                        <Globe className="h-3 w-3 shrink-0 text-sky-400" />
-                        <span className="truncate">{s.title}</span>
-                    </a>
-                ))}
-            </div>
+        {/* Live tool progress */}
+        {activeToolProgress && (
+            <ToolProgressRow
+                tool={activeToolProgress.tool}
+                label={activeToolProgress.label}
+                startTime={activeToolProgress.startTime}
+                endTime={activeToolProgress.endTime}
+                progressPct={activeToolProgress.progressPct}
+            />
         )}
 
-        {/* Docs being read — show doc names */}
-        {docsStatus.length > 0 && (
-            <div className="space-y-1">
-                {docsStatus.slice(0, 3).map((doc, i) => (
-                    <div key={i} className="flex items-center gap-2 text-[11px]">
-                        <FileText className="h-3 w-3 shrink-0 text-amber-400" />
-                        <span className="text-zinc-400 truncate">{doc}</span>
-                    </div>
-                ))}
+        {/* File action cards */}
+        {Array.from(fileActionsMap.values()).map(f => (
+            <FileActionCard
+                key={f.path}
+                path={f.path}
+                status={f.status}
+                op={f.op}
+                onClick={() => onOpenFile?.(f.path)}
+            />
+        ))}
+
+        {/* Fallback indicator if structured events haven't arrived yet */}
+        {agentSteps.length === 0 && !activeToolProgress && fileActionsMap.size === 0 && (
+            <div className="flex items-center gap-2.5 py-1">
+                <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                <span className="text-[12px] font-medium text-zinc-200">
+                    {liveActivity?.label || 'Writing response'}
+                </span>
+                <span className="ml-auto text-[11px] text-zinc-500 font-mono">{elapsed}s</span>
             </div>
         )}
     </div>
@@ -1349,67 +1330,47 @@ export const ChatPanel = ({
                 <button type="button" onClick={() => setReasoningPopupOpen(!reasoningPopupOpen)} className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-2.5 rounded-full border border-white/[.08] bg-[#161b22]/95 px-3.5 py-2 text-[11px] text-zinc-300 shadow-2xl backdrop-blur-xl transition-colors hover:border-white/[.15]">
                     {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" /> : <Brain className="h-3.5 w-3.5 text-zinc-400" />}
                     <span className="font-medium">{loading ? 'Working...' : 'Done'}</span>
-                    <span className="text-[10px] text-zinc-500">{statusLog.length} step{statusLog.length === 1 ? '' : 's'}</span>
+                    <span className="text-[10px] text-zinc-500">{agentSteps.length || statusLog.length} step{(agentSteps.length || statusLog.length) === 1 ? '' : 's'}</span>
                     <ChevronDown className={`h-3 w-3 text-zinc-500 transition-transform ${reasoningPopupOpen ? 'rotate-180' : ''}`} />
                 </button>
             )}
 
-            {reasoningPopupOpen && statusLog.length > 0 && (
+            {reasoningPopupOpen && (agentSteps.length > 0 || statusLog.length > 0) && (
                 <div className="absolute left-1/2 top-16 z-20 -translate-x-1/2 w-full max-w-sm rounded-xl border border-white/[.08] bg-[#161b22] shadow-2xl overflow-hidden">
                     <div className="flex items-center justify-between border-b border-white/[.06] px-3 py-2.5">
                         <span className="text-[10px] font-semibold uppercase tracking-[.12em] text-zinc-300">Steps</span>
                         <button type="button" onClick={() => setReasoningPopupOpen(false)} className="rounded p-1 text-zinc-500 hover:text-zinc-300"><X className="h-3 w-3" /></button>
                     </div>
                     <div className="max-h-[40vh] overflow-y-auto divide-y divide-white/[.05]">
-                        {statusLog.map((log, i) => (
-                            <div key={i} className="flex items-center gap-2.5 px-3 py-2">
-                                {log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}
-                                <span className={`text-[11px] ${log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}`}>{log.message}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* To-dos checklist — Freebuff-style sticky panel */}
-            {todos.length > 0 && (
-                <div className="mx-1 mb-1.5 rounded-xl border border-white/[.06] bg-[#161b22] overflow-hidden">
-                    <div className="flex items-center gap-2.5 px-3 py-2.5">
-                        <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                                <span className="text-[9px] text-emerald-400 font-bold font-mono">{todos.filter(t => t.done).length}</span>
-                            </div>
-                            <span className="text-[12px] font-semibold text-zinc-200">To-dos</span>
-                            <span className="text-[10px] text-zinc-500">{todos.filter(t => t.done).length}/{todos.length}</span>
-                        </div>
-                        <ChevronDown className="h-3.5 w-3.5 text-zinc-500 ml-auto" />
-                    </div>
-                    <div className="divide-y divide-white/[.04] px-3 pb-2.5">
-                        {todos.map((todo, i) => (
-                            <div key={i} className="flex items-center gap-2.5 py-2">
-                                {todo.done ? (
-                                    <div className="w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
-                                        <Check className="h-3 w-3 text-emerald-400" />
+                        {agentSteps.length > 0 ? (
+                            agentSteps.map((step, i) => (
+                                <div key={i} className="flex items-center justify-between px-3 py-2">
+                                    <div className="flex items-center gap-2.5">
+                                        {step.endTime ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}
+                                        <span className="text-[11px] text-zinc-300">{step.label}</span>
                                     </div>
-                                ) : (
-                                    <div className="w-5 h-5 rounded-full border-2 border-zinc-600 shrink-0" />
-                                )}
-                                <span className={`text-[12px] ${todo.done ? 'text-zinc-500 line-through' : 'text-zinc-300'}`}>{todo.text}</span>
-                            </div>
-                        ))}
+                                    <span className="font-mono text-[10px] text-zinc-500">
+                                        {step.endTime ? `${Math.round((step.endTime - step.startTime) / 1000)}s` : 'running'}
+                                    </span>
+                                </div>
+                            ))
+                        ) : (
+                            statusLog.map((log, i) => (
+                                <div key={i} className="flex items-center gap-2.5 px-3 py-2">
+                                    {log.type === 'done' ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> : log.type === 'error' ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-400" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-400" />}
+                                    <span className={`text-[11px] ${log.type === 'error' ? 'text-red-300' : log.type === 'done' ? 'text-zinc-400' : 'text-zinc-200'}`}>{log.message}</span>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             )}
 
-            {/* Message queued indicator — Freebuff style */}
-            {loading && (
-                <div className="mx-1 mb-1.5 flex items-center gap-2.5 rounded-xl border border-white/[.06] bg-[#161b22] px-3 py-2.5">
-                    <div className="w-4 h-4 rounded-full border-2 border-zinc-600 flex items-center justify-center shrink-0">
-                        <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-pulse" />
-                    </div>
-                    <span className="text-[11px] text-zinc-400">Message queued</span>
-                </div>
-            )}
+            {/* To-dos checklist — pinned near bottom */}
+            <TodoPanel items={streamTodos.length > 0 ? streamTodos : todos.map(t => ({ text: t.text, status: t.done ? 'done' : 'pending' }))} />
+
+            {/* Message queued indicator */}
+            <QueuedMessageChip prompt={queuedMessage?.prompt} visible={!!queuedMessage} />
 
             <div className="mt-auto px-1 pb-1">
                 <div className={`relative rounded-2xl transition-all duration-500 ${loading ? 'p-[1px]' : ''}`} onDragOver={handleDragOver} onDrop={handleDrop}>

@@ -227,6 +227,15 @@ export const aiApi = {
             body: JSON.stringify({ settings })
         });
         return safeJson(res);
+    },
+    queueMessage: async (sessionId: string, prompt: string) => {
+        const res = await fetch(`${BASE_URL}/ai/generate/queue`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ sessionId, prompt })
+        });
+        return safeJson(res);
     }
 };
 
