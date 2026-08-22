@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Bot, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, FileCode, FileText, Globe, Loader2, Sparkles, TerminalSquare, Download, AlertCircle, Clock, FileEdit } from 'lucide-react';
+import { KodariToolCard } from './AgentActivityStream';
 
 export interface QuestionItem { id: string; question: string; options: string[]; }
 export interface PlanData { title: string; summary: string; components?: { name: string; desc: string }[]; designDirection?: string[]; }
-export interface ChatMetadata { plan?: PlanData; questions?: QuestionItem[]; answers?: Record<string, string>; status?: string; files?: { path: string; size?: number }[]; created?: string[]; edited?: string[]; search?: { queries: string[]; sources: { title: string; url: string }[] }; docs?: string[]; commands?: { command: string; status: string; output?: string }[]; downloads?: { url: string; path: string; success: boolean }[]; event?: string; stepsCount?: number; elapsed?: number; }
+export interface ChatMetadata { plan?: PlanData; questions?: QuestionItem[]; answers?: Record<string, string>; status?: string; files?: { path: string; size?: number }[]; created?: string[]; edited?: string[]; read?: string[]; search?: { queries: string[]; sources: { title: string; url: string }[] }; docs?: string[]; commands?: { command: string; status: string; output?: string }[]; downloads?: { url: string; path: string; success: boolean }[]; event?: string; stepsCount?: number; elapsed?: number; }
 
 interface Props {
   id?: number; role: 'user' | 'assistant'; content: string; created_at?: string; messageType?: string;
@@ -150,14 +151,19 @@ export function ChatMessage({ id, role, content, created_at, messageType = 'mess
       <div className="text-[11px] text-zinc-400 leading-relaxed whitespace-pre-wrap">{content}</div>
     </CollapsibleSection>}
 
-    {/* Build metadata sections */}
-    {messageType === 'build' && <>
-      <FilesChangedBox files={metadata.files} created={metadata.created} edited={metadata.edited} onOpenFile={onOpenFile} />
-      <SearchBox search={metadata.search} />
-      <DocsBox docs={metadata.docs} />
-      <CommandsBox commands={metadata.commands} />
-      <DownloadsBox downloads={metadata.downloads} />
-    </>}
+    {/* Build metadata sections — exact Kodari AI tool card UI */}
+    {messageType === 'build' && (
+      <KodariToolCard
+        readFiles={metadata.read || []}
+        createdFiles={metadata.created || (metadata.files || []).map(f => f.path)}
+        editedFiles={metadata.edited || []}
+        readDocs={metadata.docs || []}
+        commands={metadata.commands || []}
+        searchSources={metadata.search?.sources || []}
+        onOpenFile={onOpenFile}
+        defaultExpanded={false}
+      />
+    )}
     {messageType !== 'build' && <SearchBox search={metadata.search} />}
 
     {/* Plan message */}

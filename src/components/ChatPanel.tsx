@@ -17,7 +17,8 @@ import {
     FileActionCard,
     ToolProgressRow,
     TodoPanel,
-    QueuedMessageChip
+    QueuedMessageChip,
+    KodariToolCard
 } from './AgentActivityStream';
 import {
     StepEvent,
@@ -159,6 +160,7 @@ export const ChatPanel = ({
     const [agentPlan, setAgentPlan] = useState<string | null>(null);
     const [agentReasonings, setAgentReasonings] = useState<ReasoningEvent[]>([]);
     const [fileActionsMap, setFileActionsMap] = useState<Map<string, FileActionEvent>>(new Map());
+    const [readFiles, setReadFiles] = useState<string[]>([]);
     const [activeToolProgress, setActiveToolProgress] = useState<ToolProgressEvent | null>(null);
     const [queuedMessage, setQueuedMessage] = useState<{ prompt: string; timestamp: number } | null>(null);
     const [streamTodos, setStreamTodos] = useState<TodoItem[]>([]);
@@ -747,7 +749,10 @@ export const ChatPanel = ({
                             content: existing?.content
                         });
                         return next;
-                    });
+                              } else if (ev.event === 'read_files' && Array.isArray(ev.paths)) {
+                    setReadFiles(prev => Array.from(new Set([...prev, ...ev.paths])));
+                } else if (ev.event === 'read_file' && ev.path) {
+                    setReadFiles(prev => Array.from(new Set([...prev, ev.path])));
                 } else if (ev.event === 'todo_update') {
                     if (Array.isArray(ev.items)) {
                         setStreamTodos(ev.items);
@@ -884,7 +889,7 @@ export const ChatPanel = ({
             }
 
             if (streamedFiles) {
-                // Files were already revealed live via SSE ΓÇö just confirm completion
+                // Files were already revealed live via SSE — just confirm completion
                 setGeneratedFiles({ created, edited });
                 logs.push({ message: `${platformLabel} ${modeLabel} assembly complete!`, type: 'done' });
                 setStatusLog([...logs]);
@@ -938,6 +943,7 @@ export const ChatPanel = ({
                     files: result.files.map((file: any) => ({ path: file.path, size: file.content?.length || 0 })),
                     created,
                     edited,
+                    read: readFiles,
                     search: localSearch.queries.length > 0 ? localSearch : undefined,
                     docs: localDocs.length > 0 ? localDocs : undefined,
                     commands: localCommands.length > 0 ? localCommands : undefined,
@@ -1180,16 +1186,26 @@ export const ChatPanel = ({
 
 {loading && (
     <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 space-y-2 px-4 py-2">
-        {/* Step counter header */}
-        <StepCounter steps={agentSteps} expanded={true} />
-
         {/* First-person plan line */}
         {agentPlan && <PlanLine text={agentPlan} />}
 
-        {/* Reasoning blocks */}
-        {agentReasonings.slice(-1).map((r, i) => (
+        {/* Live reasoning commentary */}
+        {agentReasonings.slice(-2).map((r, i) => (
             <ReasoningBlock key={i} text={r.text} defaultOpen={true} />
         ))}
+
+        {/* Exact Kodari AI live tool card matching screenshot */}
+        <KodariToolCard
+            readFiles={readFiles}
+            createdFiles={generatedFiles.created}
+            editedFiles={generatedFiles.edited}
+            readDocs={docsStatus}
+            commands={commandStatus}
+            searchSources={searchStatus?.sources || []}
+            isStreaming={true}
+            onOpenFile={onOpenFile}
+            defaultExpanded={true}
+        />
 
         {/* Live tool progress */}
         {activeToolProgress && (
@@ -1202,23 +1218,12 @@ export const ChatPanel = ({
             />
         )}
 
-        {/* File action cards */}
-        {Array.from(fileActionsMap.values()).map(f => (
-            <FileActionCard
-                key={f.path}
-                path={f.path}
-                status={f.status}
-                op={f.op}
-                onClick={() => onOpenFile?.(f.path)}
-            />
-        ))}
-
-        {/* Fallback indicator if structured events haven't arrived yet */}
-        {agentSteps.length === 0 && !activeToolProgress && fileActionsMap.size === 0 && (
+        {/* Fallback indicator if no events have arrived yet */}
+        {readFiles.length === 0 && generatedFiles.created.length === 0 && generatedFiles.edited.length === 0 && docsStatus.length === 0 && commandStatus.length === 0 && !activeToolProgress && (
             <div className="flex items-center gap-2.5 py-1">
                 <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
                 <span className="text-[12px] font-medium text-zinc-200">
-                    {liveActivity?.label || 'Writing response'}
+                    {liveActivity?.label || 'Writing response...'}
                 </span>
                 <span className="ml-auto text-[11px] text-zinc-500 font-mono">{elapsed}s</span>
             </div>
