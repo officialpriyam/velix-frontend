@@ -298,6 +298,32 @@ export function TodoPanel({ items }: { items: TodoItem[] }) {
     );
 }
 
+/**
+ * 7. <QueuedMessageChip /> — small footer chip "🕐 Message queued ˅" shown when user sends mid-turn.
+ */
+export function QueuedMessageChip({ prompt, visible }: { prompt?: string; visible: boolean }) {
+    const [expanded, setExpanded] = useState(false);
+    if (!visible) return null;
+
+    return (
+        <div className="my-1.5 font-sans">
+            <button
+                type="button"
+                onClick={() => setExpanded(!expanded)}
+                className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] font-medium text-amber-300 hover:bg-amber-500/20 transition-all shadow-sm"
+            >
+                <Clock className="h-3.5 w-3.5 animate-pulse" />
+                <span>Message queued</span>
+                <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+            </button>
+            {expanded && prompt && (
+                <div className="mt-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5 text-[11px] text-amber-200/90 font-sans">
+                    "{prompt}"
+                </div>
+            )}
+        </div>
+    );
+}
 
 /**
  * 8. <KodariToolCard /> — Exact tool card UI matching Kodari AI (screenshot):
