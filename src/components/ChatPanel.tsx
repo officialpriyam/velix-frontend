@@ -749,7 +749,8 @@ export const ChatPanel = ({
                             content: existing?.content
                         });
                         return next;
-                              } else if (ev.event === 'read_files' && Array.isArray(ev.paths)) {
+                    });
+                } else if (ev.event === 'read_files' && Array.isArray(ev.paths)) {
                     setReadFiles(prev => Array.from(new Set([...prev, ...ev.paths])));
                 } else if (ev.event === 'read_file' && ev.path) {
                     setReadFiles(prev => Array.from(new Set([...prev, ev.path])));
