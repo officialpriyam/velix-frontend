@@ -157,6 +157,7 @@ export const ChatPanel = ({
     const [todos, setTodos] = useState<{ text: string; done: boolean }[]>([]);
     const [stepsCount, setStepsCount] = useState(0);
     const [elapsed, setElapsed] = useState(0);
+    const [liveActivity, setLiveActivity] = useState<{ type: 'file' | 'search' | 'docs' | 'command' | 'generating' | 'thinking'; label: string; sublabel?: string } | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -322,6 +323,7 @@ export const ChatPanel = ({
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
         }
+        setLiveActivity(null);
         setLoading(false);
         setStatusLog([{ message: 'Generation stopped by user', type: 'error' }]);
     };
@@ -621,6 +623,7 @@ export const ChatPanel = ({
             modeLabel = 'Plugin';
         }
 
+        setLiveActivity({ type: 'thinking', label: 'Analyzing request', sublabel: '' });
         setStatusLog([
             { message: 'Analyzing request...', type: 'pending' }
         ]);
@@ -736,6 +739,7 @@ export const ChatPanel = ({
                     setTodos(prev => prev.map((t, i) => i === ev.index ? { ...t, done: true } : t));
                 } else if (ev.event === 'searching') {
                     searchQuery = ev.query || searchQuery;
+                    setLiveActivity({ type: 'search', label: 'Searching the web', sublabel: ev.query || '' });
                     logs.push({ message: 'Searching the web...', type: 'pending' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'search') {
@@ -744,6 +748,7 @@ export const ChatPanel = ({
                         localSearch.sources.push({ title: ev.title, url: ev.url });
                         setSearchStatus({ queries: [...localSearch.queries], sources: [...localSearch.sources] });
                     }
+                    setLiveActivity({ type: 'search', label: 'Found source', sublabel: ev.title || ev.url || '' });
                     logs.push({ message: `Found source: ${ev.title || 'web result'}`, type: 'done' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'docs') {
@@ -753,9 +758,12 @@ export const ChatPanel = ({
                         setDocsStatus([...localDocs]);
                     }
                     const docCount = ev.docs?.length || 0;
+                    const docNames = ev.docs?.slice(0, 2).join(', ') || 'documentation';
+                    setLiveActivity({ type: 'docs', label: `Reading ${docCount} doc${docCount === 1 ? '' : 's'}`, sublabel: docNames });
                     logs.push({ message: `Reading ${docCount > 0 ? docCount + ' doc' + (docCount === 1 ? '' : 's') : 'project documentation'}...`, type: 'done' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'model') {
+                    setLiveActivity({ type: 'generating', label: 'Generating code', sublabel: ev.model || '' });
                     logs.push({ message: `Generating with ${ev.model}...`, type: 'pending' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'file') {
@@ -772,10 +780,12 @@ export const ChatPanel = ({
                     if (ev.content && onFileStream) {
                         onFileStream({ path: ev.path, content: ev.content });
                     }
+                    setLiveActivity({ type: 'file', label: isNew ? 'Creating file' : 'Editing file', sublabel: ev.path || '' });
                     logs.push({ message: `${isNew ? '+' : '~'} ${isNew ? 'Created' : 'Edited'} ${ev.path}`, type: 'done' });
                     setStatusLog([...logs]);
                 } else if (ev.event === 'command') {
                     if (ev.status === 'running') {
+                        setLiveActivity({ type: 'command', label: 'Running command', sublabel: ev.command || '' });
                         logs.push({ message: `Running command: ${ev.command}`, type: 'pending' });
                     } else {
                         const entry = { command: ev.command, status: ev.status === 'done' ? 'done' : 'error', output: ev.output };
@@ -813,6 +823,7 @@ export const ChatPanel = ({
                 setStatusLog([{ message: `Error: ${fetchErr.message || 'Network error'}`, type: 'error' }]);
                 showNotification(fetchErr.message || 'Failed to connect to server', 'error');
             }
+            setLiveActivity(null);
             setLoading(false);
             return;
         }
@@ -820,6 +831,7 @@ export const ChatPanel = ({
         if (result.error) {
             setStatusLog([{ message: `Error: ${result.error}`, type: 'error' }]);
             showNotification(result.error, 'error');
+            setLiveActivity(null);
             setLoading(false);
             return;
         }
@@ -942,6 +954,7 @@ export const ChatPanel = ({
                 { role: 'assistant', content: result.rawResponse }
             ]);
         }
+        setLiveActivity(null);
         setLoading(false);
     };
 
@@ -1165,21 +1178,30 @@ export const ChatPanel = ({
 })}
 
 {loading && (
-    <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 space-y-1 px-3 py-1">
-        {/* Running tool indicator with progress bar */}
-        <div className="flex items-center gap-2.5 py-2">
+    <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 space-y-1.5 px-5 py-2">
+        {/* Freebuff-style live activity indicator */}
+        <div className="flex items-center gap-2.5">
             <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
-            <span className="text-[12px] font-medium text-zinc-200">
-                {generatedFiles.created.length > 0 || generatedFiles.edited.length > 0 ? 'Writing response' : 'read_files'}
-            </span>
-            <span className="text-[10px] text-zinc-500">· streaming output</span>
-            <span className="ml-auto text-[11px] text-zinc-500 tabular-nums font-mono">{elapsed}s</span>
+            <div className="flex items-center gap-2 min-w-0">
+                {liveActivity?.type === 'file' && <FileCode className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
+                {liveActivity?.type === 'search' && <Globe className="h-3.5 w-3.5 shrink-0 text-sky-400" />}
+                {liveActivity?.type === 'docs' && <FileText className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
+                {liveActivity?.type === 'command' && <TerminalSquare className="h-3.5 w-3.5 shrink-0 text-violet-400" />}
+                {liveActivity?.type === 'generating' && <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-400" />}
+                {liveActivity?.type === 'thinking' && <Brain className="h-3.5 w-3.5 shrink-0 text-zinc-400" />}
+                {!liveActivity && <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-400" />}
+                <span className="text-[12px] font-medium text-zinc-200 truncate">
+                    {liveActivity?.label || (generatedFiles.created.length > 0 || generatedFiles.edited.length > 0 ? 'Writing response' : 'read_files')}
+                </span>
+                {liveActivity?.sublabel && <span className="text-[10px] text-zinc-500 truncate max-w-[180px]">· {liveActivity.sublabel}</span>}
+            </div>
+            <span className="ml-auto text-[11px] text-zinc-500 tabular-nums font-mono shrink-0">{elapsed}s</span>
         </div>
         <div className="h-[3px] w-full rounded-full bg-white/[.04] overflow-hidden">
             <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: loading ? '90%' : '100%' }} />
         </div>
 
-        {/* Live commentary from status log */}
+        {/* Live commentary from status log — show last completed steps */}
         {statusLog.filter(l => l.type === 'done' && l.message).slice(-3).map((log, i) => (
             <div key={i} className="flex items-center gap-2 py-0.5">
                 <Check className="h-3 w-3 shrink-0 text-emerald-400" />
@@ -1187,17 +1209,17 @@ export const ChatPanel = ({
             </div>
         ))}
 
-        {/* Inline file badges */}
+        {/* Inline file badges — show all files created/edited so far */}
         {[...generatedFiles.created.map(p => ({ path: p, edited: false })), ...generatedFiles.edited.map(p => ({ path: p, edited: true }))].map(({ path, edited }, i) => (
-            <button key={path + i} type="button" onClick={() => onOpenFile?.(path)} className="flex items-center gap-2 rounded-lg border border-white/[.06] bg-white/[.025] px-2.5 py-1.5 text-[11px] transition-colors hover:border-sky-400/40 hover:bg-sky-400/[.06] w-full">
+            <button key={path + i} type="button" onClick={() => onOpenFile?.(path)} className="flex w-full items-center gap-2 rounded-lg border border-white/[.06] bg-white/[.025] px-2.5 py-1.5 text-[11px] transition-colors hover:border-sky-400/40 hover:bg-sky-400/[.06]">
                 <FileCode className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-                <span className="text-zinc-300 truncate">{path}</span>
-                <span className="ml-auto text-[10px] text-zinc-500 shrink-0">{edited ? 'EDITED' : 'CREATED'}</span>
+                <span className="text-zinc-300 truncate font-mono">{path}</span>
+                <span className="ml-auto text-[9px] font-bold uppercase text-zinc-500 shrink-0">{edited ? 'EDITED' : 'CREATED'}</span>
                 <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
             </button>
         ))}
 
-        {/* Search sources inline */}
+        {/* Search sources inline — show found web results */}
         {searchStatus && searchStatus.sources.length > 0 && (
             <div className="space-y-1">
                 {searchStatus.sources.slice(0, 3).map((s, i) => (
@@ -1205,6 +1227,18 @@ export const ChatPanel = ({
                         <Globe className="h-3 w-3 shrink-0 text-sky-400" />
                         <span className="truncate">{s.title}</span>
                     </a>
+                ))}
+            </div>
+        )}
+
+        {/* Docs being read — show doc names */}
+        {docsStatus.length > 0 && (
+            <div className="space-y-1">
+                {docsStatus.slice(0, 3).map((doc, i) => (
+                    <div key={i} className="flex items-center gap-2 text-[11px]">
+                        <FileText className="h-3 w-3 shrink-0 text-amber-400" />
+                        <span className="text-zinc-400 truncate">{doc}</span>
+                    </div>
                 ))}
             </div>
         )}
